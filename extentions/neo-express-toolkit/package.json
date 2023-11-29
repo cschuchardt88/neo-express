@@ -18,11 +18,28 @@
         "command": "neo-express-toolkit.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "views": {
+      "neo-express-explorer": [
+        {
+          "id": "neo-express-toolkit.helloWorld",
+          "name": "Hello World"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "neo-express-explorer",
+          "title": "Neo Express Explorer",
+          "icon": "resources/neo-express.png"
+        }
+      ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
-    "build": "rollup -c --environment INCLUDE_DEPS,BUILD:production",
+    "build": "rollup -c --environment INCLUDE_DEPS,BUILD:production && cd ./controls/ && npm run build",
     "watch": "rollup -c -w",
     "pretest": "npm run lint",
     "test": "node ./test/runTest.js"
