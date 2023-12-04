@@ -13,6 +13,10 @@ export default defineConfig({
   build: {
     outDir: 'build',
     rollupOptions: {
+      input: {
+        index: resolve(__dirname, 'src/main.ts'),
+        // blocks: resolve(__dirname, 'src/blocks.ts'),
+      },
       output: {
         entryFileNames: `assets/[name].js`,
         chunkFileNames: `assets/[name].js`,

@@ -2,6 +2,8 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { HelloWorldPanel } from "./panels/HelloWorldPanel";
+import { ExpressWalletTreeDataProvider } from './providers/ExpressWalletTreeDataProvider';
+import { TestWs } from './network/webSocketClinet';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -20,9 +22,14 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from Neo Express Toolkit!');
 
 		HelloWorldPanel.render(context.extensionUri);
+
+		TestWs();
 	});
 
 	context.subscriptions.push(disposable);
+
+	let ewtp = new ExpressWalletTreeDataProvider();
+	ewtp.register(context);
 }
 
 // This method is called when your extension is deactivated
