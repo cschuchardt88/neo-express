@@ -1,13 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-/**
- * @param {vscode.ExtensionContext} context
- */
 function prepareWebView(context) {
 	const panel = vscode.window.createWebviewPanel(
 		'vueWebview',
-		'vue webview',
+		'Vue Web View Test',
 		vscode.ViewColumn.One,
 		{
 			enableScripts: true,
