@@ -22,8 +22,6 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from Neo Express Toolkit!');
 
 		HelloWorldPanel.render(context.extensionUri);
-
-		TestWs();
 	});
 
 	context.subscriptions.push(disposable);
