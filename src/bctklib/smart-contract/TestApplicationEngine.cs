@@ -31,7 +31,7 @@ namespace Neo.BlockchainToolkit.SmartContract
         static TestApplicationEngine()
         {
             var builder = ImmutableDictionary.CreateBuilder<uint, InteropDescriptor>();
-            builder.Add(OverrideDescriptor(ApplicationEngine.System_Runtime_CheckWitness, nameof(CheckWitnessOverride)));
+            builder.Add(OverrideDescriptor(System_Runtime_CheckWitness, nameof(CheckWitnessOverride)));
             overriddenServices = builder.ToImmutable();
 
             static KeyValuePair<uint, InteropDescriptor> OverrideDescriptor(InteropDescriptor descriptor, string overrideMethodName)
@@ -200,7 +200,7 @@ namespace Neo.BlockchainToolkit.SmartContract
             return base.Execute();
         }
 
-        protected override void LoadContext(ExecutionContext context)
+        public override void LoadContext(ExecutionContext context)
         {
             base.LoadContext(context);
             coverageWriter?.WriteContext(context);
@@ -310,15 +310,15 @@ namespace Neo.BlockchainToolkit.SmartContract
 
         bool CheckWitnessOverride(byte[] hashOrPubkey) => witnessChecker(hashOrPubkey);
 
-        protected override void OnSysCall(uint methodHash)
+        protected override void OnSysCall(InteropDescriptor descriptor)
         {
-            if (overriddenServices.TryGetValue(methodHash, out var descriptor))
+            if (overriddenServices.TryGetValue(descriptor, out var overrideDescriptor))
             {
-                base.OnSysCall(descriptor);
+                base.OnSysCall(overrideDescriptor);
             }
             else
             {
-                base.OnSysCall(methodHash);
+                base.OnSysCall(descriptor);
             }
         }
     }
