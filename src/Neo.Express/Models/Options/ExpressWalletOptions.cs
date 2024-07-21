@@ -12,7 +12,7 @@
 using Microsoft.Extensions.Configuration;
 using System.Text.Json.Serialization;
 
-namespace Neo.Express.Models
+namespace Neo.Express.Models.Options
 {
     internal class ExpressWalletOptions
     {

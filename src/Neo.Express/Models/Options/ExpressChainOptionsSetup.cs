@@ -12,7 +12,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Neo.Express.Models
+namespace Neo.Express.Models.Options
 {
     internal class ExpressChainOptionsSetup
         (IConfiguration configuration) : IConfigureOptions<ExpressChainOptions>

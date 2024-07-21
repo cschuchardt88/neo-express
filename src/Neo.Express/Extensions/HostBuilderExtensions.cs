@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Neo.Express.Hosting;
 using Neo.Express.Hosting.Configuration;
-using Neo.Express.Models;
+using Neo.Express.Models.Options;
 
 namespace Neo.Express.Extensions
 {
