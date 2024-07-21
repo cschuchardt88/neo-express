@@ -10,9 +10,11 @@
 // modifications are permitted.
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Neo.Express.Hosting;
 using Neo.Express.Hosting.Configuration;
+using Neo.Express.Models;
 
 namespace Neo.Express.Extensions
 {
@@ -47,6 +49,16 @@ namespace Neo.Express.Extensions
                 {
                     throw;
                 }
+            });
+
+            return hostBuilder;
+        }
+
+        public static IHostBuilder UseNeoExpressServices(this IHostBuilder hostBuilder)
+        {
+            hostBuilder.ConfigureServices((context, services) =>
+            {
+                services.ConfigureOptions<ExpressChainOptionsSetup>();
             });
 
             return hostBuilder;

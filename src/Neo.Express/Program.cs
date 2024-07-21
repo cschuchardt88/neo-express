@@ -29,6 +29,7 @@ namespace Neo.Express
                 {
                     builder.UseNeoExpressHostConfiguration();
                     builder.UseNeoExpressAppConfiguration(args);
+                    builder.UseNeoExpressServices();
                     builder.UseCommandHandler<ProgramCommand, EmptyHandler>();
                 })
                 .UseDefaults()
