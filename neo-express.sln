@@ -60,6 +60,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MPTTrie", "src\neo\src\Plug
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Neo.ConsoleService", "src\neo\src\Neo.ConsoleService\Neo.ConsoleService.csproj", "{723D17B6-A934-45CF-A496-4368A3E168C0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Neo.Express", "src\Neo.Express\Neo.Express.csproj", "{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -158,6 +160,10 @@ Global
 		{723D17B6-A934-45CF-A496-4368A3E168C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{723D17B6-A934-45CF-A496-4368A3E168C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{723D17B6-A934-45CF-A496-4368A3E168C0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -186,6 +192,7 @@ Global
 		{BE10D533-048E-4521-A89B-6DC1B003ECF5} = {DB7A3448-0655-4FB0-8D90-4826AD141FFA}
 		{509DD0F8-56F2-4A65-B0FC-0C67D05D83DF} = {DB7A3448-0655-4FB0-8D90-4826AD141FFA}
 		{723D17B6-A934-45CF-A496-4368A3E168C0} = {DB7A3448-0655-4FB0-8D90-4826AD141FFA}
+		{C73F0AA0-86C2-44F6-96F2-18B3ADF3CDB5} = {BCED0811-9E4F-4034-B297-D21311F81F98}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {14A0ACFA-EDC0-48D6-9C28-1EBCC3D544A5}
