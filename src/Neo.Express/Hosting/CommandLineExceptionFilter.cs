@@ -20,7 +20,7 @@ namespace Neo.Express.Hosting
         {
             if (exception is not OperationCanceledException)
             {
-                context.Console.ErrorMessage(exception);
+                context.Console.ErrorMessage(exception, false);
             }
 
             context.ExitCode = exception.HResult;

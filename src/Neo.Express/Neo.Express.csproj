@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>Neo.Express</RootNamespace>
-    <AssemblyName>exp-cmd</AssemblyName>
+    <AssemblyName>neoxp</AssemblyName>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OutputPath>../../bin/$(RootNamespace)</OutputPath>

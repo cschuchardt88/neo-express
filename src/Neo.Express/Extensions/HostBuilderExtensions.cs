@@ -9,12 +9,11 @@
 // Redistribution and use in source and binary forms with or without
 // modifications are permitted.
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Neo.Express.Hosting;
-using Neo.Express.Hosting.Configuration;
-using Neo.Express.Models.Options;
+using Neo.Express.Hosting.Setup;
+using System.CommandLine.Invocation;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Neo.Express.Extensions
 {
@@ -32,23 +31,12 @@ namespace Neo.Express.Extensions
 
         public static IHostBuilder UseNeoExpressAppConfiguration(this IHostBuilder hostBuilder, string[]? args = null)
         {
+            _ = hostBuilder.TryGetGlobalInputOption(out var inputFilename);
+
             hostBuilder.ConfigureAppConfiguration((context, config) =>
             {
-                if (args != null)
-                    config.AddCommandLine(args);
-
                 config.AddNeoExpressConfiguration();
-
-                try
-                {
-                    config.AddJsonFile(NeoExpressConfigurationDefaults.ProgramConfigFilename, optional: true);
-                    config.AddJsonFile(NeoExpressConfigurationDefaults.ExpressConfigFilename, optional: false);
-                    config.Add(new NeoExpressConfigurationSource());
-                }
-                catch (FileNotFoundException)
-                {
-                    throw;
-                }
+                config.AddNeoExpressDefaultFiles(() => inputFilename);
             });
 
             return hostBuilder;
@@ -62,6 +50,20 @@ namespace Neo.Express.Extensions
             });
 
             return hostBuilder;
+        }
+
+        public static bool TryGetGlobalInputOption(this IHostBuilder hostBuilder, [NotNullWhen(true)] out string? filename)
+        {
+            var invocation = hostBuilder.Properties[typeof(InvocationContext)] as InvocationContext;
+            var command = invocation!.ParseResult.CommandResult.Command;
+            var inputOptions = command.Options.FirstOrDefault(f => f.Name == "input");
+
+            filename = null;
+
+            if (inputOptions != null)
+                filename = invocation.ParseResult.GetValueForOption(inputOptions) as string;
+
+            return filename != null;
         }
     }
 }

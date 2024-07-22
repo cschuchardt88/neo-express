@@ -9,8 +9,8 @@
 // Redistribution and use in source and binary forms with or without
 // modifications are permitted.
 
-using Neo.Express.Command;
-using Neo.Express.Command.Handler;
+using Neo.Express.Commands;
+using Neo.Express.Commands.Handlers;
 using Neo.Express.Extensions;
 using Neo.Express.Hosting;
 using System.CommandLine.Builder;

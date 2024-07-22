@@ -1,6 +1,6 @@
 // Copyright (C) 2015-2024 The Neo Project.
 //
-// EmptyHandler.cs file belongs to the neo project and is free
+// ProgramCommand.cs file belongs to the neo project and is free
 // software distributed under the MIT software license, see the
 // accompanying file LICENSE in the main directory of the
 // repository or http://www.opensource.org/licenses/mit-license.php
@@ -9,20 +9,17 @@
 // Redistribution and use in source and binary forms with or without
 // modifications are permitted.
 
-using System.CommandLine.Invocation;
+using System.CommandLine;
 
-namespace Neo.Express.Command.Handler
+namespace Neo.Express.Commands
 {
-    internal sealed class EmptyHandler : ICommandHandler
+    internal class ProgramCommand : RootCommand
     {
-        public int Invoke(InvocationContext context)
+        public ProgramCommand() : base("Neo Express CommandLine Tool.")
         {
-            return 0;
-        }
+            var inputFile = new Option<string>(["--input", "-i"], "Path to neo-express data file.");
 
-        public Task<int> InvokeAsync(InvocationContext context)
-        {
-            return Task.FromResult(0);
+            AddGlobalOption(inputFile);
         }
     }
 }

@@ -82,7 +82,7 @@ namespace Neo.Express.Extensions
             console.ResetColor();
         }
 
-        public static void ErrorMessage(this IConsole console, Exception exception)
+        public static void ErrorMessage(this IConsole console, Exception exception, bool showStackTrace = true)
         {
             var stackTrace = exception.InnerException?.StackTrace ?? exception.StackTrace;
 
@@ -91,9 +91,14 @@ namespace Neo.Express.Extensions
             console.SetTerminalForegroundColor(ConsoleColor.DarkRed);
             Console.Error.WriteLine("   {0}", exception.InnerException?.Message ?? exception.Message);
             console.SetTerminalForegroundColor(ConsoleColor.Red);
-            Console.Error.WriteLine("Stack Trace: ");
-            console.SetTerminalForegroundColor(ConsoleColor.DarkRed);
-            Console.Error.WriteLine("   {0}", stackTrace?.Trim());
+
+            if (showStackTrace)
+            {
+                Console.Error.WriteLine("Stack Trace: ");
+                console.SetTerminalForegroundColor(ConsoleColor.DarkRed);
+                Console.Error.WriteLine("   {0}", stackTrace?.Trim());
+            }
+
             console.ResetColor();
         }
 

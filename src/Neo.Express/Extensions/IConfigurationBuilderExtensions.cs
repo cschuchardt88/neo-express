@@ -12,6 +12,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Neo.Express.Hosting;
+using Neo.Express.Hosting.Configuration;
 
 namespace Neo.Express.Extensions
 {
@@ -24,7 +25,24 @@ namespace Neo.Express.Extensions
                     new(HostDefaults.ContentRootKey, Environment.CurrentDirectory),
                 ]);
 
-            builder.SetBasePath(NeoExpressConfigurationDefaults.BaseDirectory);
+            return builder;
+        }
+
+        public static IConfigurationBuilder AddNeoExpressDefaultFiles(this IConfigurationBuilder builder, Func<string?> getInputFilename)
+        {
+            try
+            {
+                builder.SetBasePath(NeoExpressConfigurationDefaults.BaseDirectory);
+                builder.AddJsonFile(NeoExpressConfigurationDefaults.ProgramConfigFilename, optional: true);
+
+                builder.SetBasePath(Environment.CurrentDirectory);
+                builder.AddJsonFile(getInputFilename() ?? NeoExpressConfigurationDefaults.ExpressConfigFilename, optional: true);
+                builder.Add(new NeoExpressConfigurationSource());
+            }
+            catch (FileNotFoundException)
+            {
+                throw;
+            }
 
             return builder;
         }

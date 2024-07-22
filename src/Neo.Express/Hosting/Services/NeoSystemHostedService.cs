@@ -13,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Neo.Express.Extensions;
 using Neo.Express.Models.Options;
+using System.Net;
 
 namespace Neo.Express.Hosting.Services
 {
@@ -68,7 +69,11 @@ namespace Neo.Express.Hosting.Services
                     throw new InvalidOperationException($"{nameof(NeoSystemHostedService)} has already been started.");
                 _hasStarted = true;
 
-                _neoSystem = new(_expressChainOptions.GetProtocolSettings(), string.Empty);
+                _neoSystem ??= new(_expressChainOptions.GetProtocolSettings(), string.Empty);
+                _neoSystem.StartNode(new()
+                {
+                    Tcp = new(IPAddress.Loopback, _expressChainOptions.ConsensusNodes[0].TcpPort),
+                });
             }
             catch
             {
@@ -83,6 +88,7 @@ namespace Neo.Express.Hosting.Services
                 return Task.CompletedTask;
 
             _hasStarted = false;
+            _neoSystem?.Dispose();
 
             return Task.CompletedTask;
         }

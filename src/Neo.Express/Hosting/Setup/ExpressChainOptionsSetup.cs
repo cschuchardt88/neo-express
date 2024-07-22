@@ -11,10 +11,11 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Neo.Express.Models.Options;
 
-namespace Neo.Express.Models.Options
+namespace Neo.Express.Hosting.Setup
 {
-    internal class ExpressChainOptionsSetup
+    internal sealed class ExpressChainOptionsSetup
         (IConfiguration configuration) : IConfigureOptions<ExpressChainOptions>
     {
         public void Configure(ExpressChainOptions options)
