@@ -9,6 +9,7 @@
 // Redistribution and use in source and binary forms with or without
 // modifications are permitted.
 
+using Neo.Express.Hosting;
 using System.CommandLine;
 
 namespace Neo.Express.Commands
@@ -17,7 +18,7 @@ namespace Neo.Express.Commands
     {
         public ProgramCommand() : base("Neo Express CommandLine Tool.")
         {
-            var inputFile = new Option<string>(["--input", "-i"], "Path to neo-express data file.");
+            var inputFile = new Option<string>(["--input", "-i"], () => NeoExpressConfigurationDefaults.ExpressConfigFilename, "Path to neo-express data file.");
 
             AddGlobalOption(inputFile);
         }

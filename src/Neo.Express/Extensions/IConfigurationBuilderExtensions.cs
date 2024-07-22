@@ -28,7 +28,7 @@ namespace Neo.Express.Extensions
             return builder;
         }
 
-        public static IConfigurationBuilder AddNeoExpressDefaultFiles(this IConfigurationBuilder builder, Func<string?> getInputFilename)
+        public static IConfigurationBuilder AddNeoExpressDefaultFiles(this IConfigurationBuilder builder, Func<string> getInputFilename)
         {
             try
             {
@@ -36,7 +36,7 @@ namespace Neo.Express.Extensions
                 builder.AddJsonFile(NeoExpressConfigurationDefaults.ProgramConfigFilename, optional: true);
 
                 builder.SetBasePath(Environment.CurrentDirectory);
-                builder.AddJsonFile(getInputFilename() ?? NeoExpressConfigurationDefaults.ExpressConfigFilename, optional: true);
+                builder.AddJsonFile(getInputFilename(), optional: false);
                 builder.Add(new NeoExpressConfigurationSource());
             }
             catch (FileNotFoundException)
