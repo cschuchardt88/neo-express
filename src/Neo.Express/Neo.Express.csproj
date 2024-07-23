@@ -19,5 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\neo\src\Neo\Neo.csproj" />
+    <ProjectReference Include="..\neo\src\Plugins\DBFTPlugin\DBFTPlugin.csproj" />
+    <ProjectReference Include="..\neo\src\Plugins\RpcServer\RpcServer.csproj" />
   </ItemGroup>
 </Project>
