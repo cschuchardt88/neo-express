@@ -34,6 +34,6 @@ namespace Neo.Express.Models.Options
 
         [ConfigurationKeyName("settings")]
         [JsonPropertyName("settings")]
-        public Dictionary<string, string> Settings { get; set; } = new(StringComparer.InvariantCultureIgnoreCase);
+        public Dictionary<string, string?> Settings { get; set; } = new(StringComparer.InvariantCultureIgnoreCase);
     }
 }

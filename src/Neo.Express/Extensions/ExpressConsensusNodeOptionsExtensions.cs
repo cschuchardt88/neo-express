@@ -17,6 +17,15 @@ namespace Neo.Express.Extensions
     internal static class ExpressConsensusNodeOptionsExtensions
     {
         public static KeyPair GetKeyPair(this ExpressConsensusNodeOptions expressConsensusNodeOptions) =>
-            new(Convert.FromHexString(expressConsensusNodeOptions.Wallet.Accounts.Select(s => s.PrivateKey).Distinct().Single()));
+            new(Convert.FromHexString(expressConsensusNodeOptions.Wallet.Accounts
+                .Select(s => s.PrivateKey)
+                .Distinct()
+                .Single()));
+
+        public static string GetDefaultAccountAddress(this ExpressConsensusNodeOptions expressConsensusNodeOptions) =>
+            expressConsensusNodeOptions.Wallet.Accounts
+                .Where(w => w.IsDefault == true)
+                .Select(s => s.Address)
+                .Single();
     }
 }

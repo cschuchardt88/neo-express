@@ -11,13 +11,16 @@
 
 namespace Neo.Express.Hosting
 {
-    internal class NeoExpressConfigurationDefaults
+    internal sealed class NeoExpressConfigurationDefaults
     {
         public static readonly string EnvironmentVariablePrefix = "NEOEXPRESS_";
-        public static readonly string StoreProviderName = "RocksDbStore";
+
+        public static readonly string StoreProviderName = "FasterDbStore";
+
         public static readonly string ExpressConfigFilename = "default.neo-express";
         public static readonly string ProgramConfigFilename = "config.json";
-        public static readonly string BaseDirectory = @$"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}\.neo-express";
+
+        public static readonly string BaseDirectory = $@"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}\.neo-express";
         public static readonly string BlockChainDirectoryName = "blockchain-nodes";
 
         public static readonly uint[] Networks =

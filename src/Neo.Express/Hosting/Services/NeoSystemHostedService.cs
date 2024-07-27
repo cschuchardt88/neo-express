@@ -13,24 +13,37 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Neo.Express.Extensions;
 using Neo.Express.Models.Options;
+using Neo.Express.Storage.FasterDb;
+using Neo.Plugins.DBFTPlugin;
 using System.Net;
 
 namespace Neo.Express.Hosting.Services
 {
-    internal class NeoSystemHostedService
-        (IOptions<ExpressChainOptions> options) : IHostedService, IAsyncDisposable
+    internal partial class NeoSystemHostedService : IHostedService, IAsyncDisposable
     {
-        private readonly ExpressChainOptions _expressChainOptions = options.Value;
+        private readonly ExpressChainOptions _expressChainOptions;
+        private readonly ExpressApplicationOptions _expressAppOptions;
 
         private readonly CancellationTokenSource _stopCts = new();
         private readonly TaskCompletionSource _stoppedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
         private readonly SemaphoreSlim _neoSystemStoppedSemaphore = new(1);
+
+        private readonly ProtocolSettings _protocolSettings;
 
         private NeoSystem? _neoSystem;
 
         private bool _hasStarted = false;
         private int _stopping;
+
+        public NeoSystemHostedService(
+            IOptions<ExpressApplicationOptions> appOptions,
+            IOptions<ExpressChainOptions> chainOptions)
+        {
+            _expressChainOptions = chainOptions.Value;
+            _expressAppOptions = appOptions.Value;
+
+            _protocolSettings = _expressChainOptions.GetProtocolSettings(_expressAppOptions.Blockchain.MillisecondsPerBlock);
+        }
 
         public async ValueTask DisposeAsync()
         {
@@ -69,7 +82,12 @@ namespace Neo.Express.Hosting.Services
                     throw new InvalidOperationException($"{nameof(NeoSystemHostedService)} has already been started.");
                 _hasStarted = true;
 
-                _neoSystem ??= new(_expressChainOptions.GetProtocolSettings(), string.Empty);
+                var fasterDbStore = new FasterDBStore();
+                var dbftPlugin = new DBFTPlugin(_expressChainOptions.GetConsensusSettings());
+                var chainDefaultAccountAddress = _expressChainOptions.ConsensusNodes[0].GetDefaultAccountAddress();
+                var storagePath = $@"{_expressAppOptions.Blockchain.Storage.Path}\{chainDefaultAccountAddress}";
+
+                _neoSystem ??= new(_protocolSettings, nameof(FasterDBStore), storagePath);
                 _neoSystem.StartNode(new()
                 {
                     Tcp = new(IPAddress.Loopback, _expressChainOptions.ConsensusNodes[0].TcpPort),

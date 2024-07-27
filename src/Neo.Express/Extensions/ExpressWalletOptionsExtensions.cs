@@ -19,7 +19,7 @@ namespace Neo.Express.Extensions
         public static ExpressWallet GetWallet(this ExpressWalletOptions expressWalletOptions, ProtocolSettings protocolSettings)
         {
             var wallet = new ExpressWallet(expressWalletOptions.Name, protocolSettings);
-            foreach (var account in expressWalletOptions.Accounts)
+            foreach (var account in expressWalletOptions.Accounts.OrderBy(o => o.IsDefault))
             {
                 wallet.CreateAccount(Convert.FromHexString(account.PrivateKey));
             }

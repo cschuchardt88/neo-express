@@ -47,6 +47,7 @@ namespace Neo.Express.Extensions
             hostBuilder.ConfigureServices((context, services) =>
             {
                 services.ConfigureOptions<ExpressChainOptionsSetup>();
+                services.ConfigureOptions<ExpressApplicationOptionsSetup>();
             });
 
             return hostBuilder;

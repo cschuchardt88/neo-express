@@ -20,12 +20,12 @@ namespace Neo.Express.Extensions
 {
     internal static class ExpressChainOptionsExtensions
     {
-        public static ProtocolSettings GetProtocolSettings(this ExpressChainOptions expressChainOptions) =>
+        public static ProtocolSettings GetProtocolSettings(this ExpressChainOptions expressChainOptions, uint millisecondsPerBlock) =>
             ProtocolSettings.Default with
             {
                 Network = expressChainOptions.Network,
                 AddressVersion = expressChainOptions.AddressVersion,
-                MillisecondsPerBlock = 5000,
+                MillisecondsPerBlock = millisecondsPerBlock,
                 ValidatorsCount = expressChainOptions.ConsensusNodes.Count,
                 StandbyCommittee = expressChainOptions.ConsensusNodes
                     .Select(s => s.GetKeyPair().PublicKey)
@@ -39,12 +39,12 @@ namespace Neo.Express.Extensions
             RpcServerSettings.Default with
             {
                 Network = expressChainOptions.Network,
-                BindAddress = IPAddress.Parse(expressChainOptions.Settings[RpcServerSettingsKeyNames.BindAddress]),
+                BindAddress = IPAddress.Parse(expressChainOptions.GetRpcBindAddressValue()),
                 Port = expressChainOptions.ConsensusNodes[0].RpcPort,
-                MaxGasInvoke = (long)new BigDecimal(decimal.Parse(expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxGasInvoke]), NativeContract.GAS.Decimals).Value,
-                MaxFee = (long)new BigDecimal(decimal.Parse(expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxFee]), NativeContract.GAS.Decimals).Value,
-                MaxIteratorResultItems = int.Parse(expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxIteratorResultItems]),
-                SessionEnabled = bool.Parse(expressChainOptions.Settings[RpcServerSettingsKeyNames.SessionEnabled])
+                MaxGasInvoke = (long)new BigDecimal(decimal.Parse(expressChainOptions.GetRpcMaxGasInvokeValue()), NativeContract.GAS.Decimals).Value,
+                MaxFee = (long)new BigDecimal(decimal.Parse(expressChainOptions.GetRpcMaxFeeValue()), NativeContract.GAS.Decimals).Value,
+                MaxIteratorResultItems = int.Parse(expressChainOptions.GetRpcMaxIteratorResultItemsValue()),
+                SessionEnabled = bool.Parse(expressChainOptions.GetRpcSessionEnabledValue())
             };
 
         public static Plugins.DBFTPlugin.Settings GetConsensusSettings(this ExpressChainOptions expressChainOptions)
@@ -52,7 +52,7 @@ namespace Neo.Express.Extensions
             var settings = new Dictionary<string, string?>()
             {
                 ["PluginConfiguration:Network"] = $"{expressChainOptions.Network}",
-                ["IgnoreRecoveryLogs"] = "true",
+                ["PluginConfiguration:IgnoreRecoveryLogs"] = bool.TrueString,
             };
 
             var config = new ConfigurationBuilder()
@@ -61,5 +61,20 @@ namespace Neo.Express.Extensions
 
             return new(config.GetSection("PluginConfiguration"));
         }
+
+        public static string GetRpcBindAddressValue(this ExpressChainOptions expressChainOptions) =>
+            expressChainOptions.Settings[RpcServerSettingsKeyNames.BindAddress] ?? $"{IPAddress.Loopback}";
+
+        public static string GetRpcMaxGasInvokeValue(this ExpressChainOptions expressChainOptions) =>
+            expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxGasInvoke] ?? $"{RpcServerSettings.Default.MaxGasInvoke}";
+
+        public static string GetRpcMaxFeeValue(this ExpressChainOptions expressChainOptions) =>
+            expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxFee] ?? $"{RpcServerSettings.Default.MaxFee}";
+
+        public static string GetRpcMaxIteratorResultItemsValue(this ExpressChainOptions expressChainOptions) =>
+            expressChainOptions.Settings[RpcServerSettingsKeyNames.MaxIteratorResultItems] ?? $"{RpcServerSettings.Default.MaxIteratorResultItems}";
+
+        public static string GetRpcSessionEnabledValue(this ExpressChainOptions expressChainOptions) =>
+            expressChainOptions.Settings[RpcServerSettingsKeyNames.SessionEnabled] ?? $"{RpcServerSettings.Default.SessionEnabled}";
     }
 }

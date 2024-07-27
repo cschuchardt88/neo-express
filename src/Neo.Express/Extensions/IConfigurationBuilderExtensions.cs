@@ -32,11 +32,17 @@ namespace Neo.Express.Extensions
         {
             try
             {
+                // Set location: %UserProfile%\.neo-express
                 builder.SetBasePath(NeoExpressConfigurationDefaults.BaseDirectory);
+                // Load "config.json" settings **FILE OPTIONAL**
                 builder.AddJsonFile(NeoExpressConfigurationDefaults.ProgramConfigFilename, optional: true);
 
+                // Set location: %CurrentDirectory%
                 builder.SetBasePath(Environment.CurrentDirectory);
+                // Load "default.neo-express" or "--input file" settings **FILE MUST EXIST**
                 builder.AddJsonFile(getInputFilename() ?? NeoExpressConfigurationDefaults.ExpressConfigFilename, optional: false);
+
+                // Load environment variable configurations & defaults with prefix: NEOEXPRESS_
                 builder.Add(new NeoExpressConfigurationSource());
             }
             catch (FileNotFoundException)
