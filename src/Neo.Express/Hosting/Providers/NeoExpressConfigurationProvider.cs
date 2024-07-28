@@ -47,8 +47,10 @@ namespace Neo.Express.Hosting.Providers
         private static Dictionary<string, string?> CreateDefaultKeys() =>
             new(StringComparer.OrdinalIgnoreCase)
             {
+                ["Blockchain:Storage:CheckpointPath"] = $@"{NeoExpressConfigurationDefaults.BaseDirectory}\{NeoExpressConfigurationDefaults.CheckpointDirectoryName}",
                 ["Blockchain:Storage:Path"] = $@"{NeoExpressConfigurationDefaults.BaseDirectory}\{NeoExpressConfigurationDefaults.BlockChainDirectoryName}",
-                ["Blockchain:MillisecondsPerBlock"] = $"{ExpressBlockchainDefaults.MillisecondsPerBlock}",
+                ["Blockchain:Node:MillisecondsPerBlock"] = $"{ExpressNodeDefaults.MillisecondsPerBlock}",
+                ["Blockchain:Node:Index"] = $"{ExpressNodeDefaults.NodeIndex}",
             };
 
         private static void AddIfNormalizedKeyMatchesPrefix(IDictionary<string, string?> data, string normalizedKey, string? value)

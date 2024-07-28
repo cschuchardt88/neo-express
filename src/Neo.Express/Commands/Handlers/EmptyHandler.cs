@@ -9,6 +9,8 @@
 // Redistribution and use in source and binary forms with or without
 // modifications are permitted.
 
+using Microsoft.Extensions.Hosting;
+using System.CommandLine.Hosting;
 using System.CommandLine.Invocation;
 
 namespace Neo.Express.Commands.Handlers
@@ -20,9 +22,14 @@ namespace Neo.Express.Commands.Handlers
             return 0;
         }
 
-        public Task<int> InvokeAsync(InvocationContext context)
+        public async Task<int> InvokeAsync(InvocationContext context)
         {
-            return Task.FromResult(0);
+            var host = context.GetHost();
+            var cancelToken = context.GetCancellationToken();
+
+            await host.RunAsync(cancelToken);
+
+            return 0;
         }
     }
 }

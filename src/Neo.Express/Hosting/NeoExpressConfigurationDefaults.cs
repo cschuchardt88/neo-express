@@ -15,13 +15,14 @@ namespace Neo.Express.Hosting
     {
         public static readonly string EnvironmentVariablePrefix = "NEOEXPRESS_";
 
-        public static readonly string StoreProviderName = "FasterDbStore";
+        public static readonly string StoreProviderName = "FasterDBStore";
 
         public static readonly string ExpressConfigFilename = "default.neo-express";
         public static readonly string ProgramConfigFilename = "config.json";
 
         public static readonly string BaseDirectory = $@"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}\.neo-express";
         public static readonly string BlockChainDirectoryName = "blockchain-nodes";
+        public static readonly string CheckpointDirectoryName = "checkpoints";
 
         public static readonly uint[] Networks =
         [

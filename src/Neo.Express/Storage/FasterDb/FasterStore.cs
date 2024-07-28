@@ -10,6 +10,7 @@
 // modifications are permitted.
 
 using FASTER.core;
+using Neo.Express.Hosting;
 using Neo.Persistence;
 using System.Collections;
 
@@ -17,80 +18,58 @@ namespace Neo.Express.Storage.FasterDb
 {
     internal sealed class FasterStore : IStore, IEnumerable<KeyValuePair<byte[], byte[]>>
     {
-        private readonly AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, ByteArrayFunctions>> _sessionPool;
+        private readonly AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, SimpleFunctions<byte[], byte[]>>> _sessionPool;
         private readonly FasterKV<byte[], byte[]> _store;
-        private readonly LogSettings _logSettings;
-        private readonly CheckpointSettings _checkpointSettings;
 
-        private readonly LinkedList<byte[]> _linkedList_Keys = new();
+        private readonly IDevice _logDevice;
+        private readonly IDevice _objLogDevice;
+
         private readonly string _storePath;
 
         public FasterStore(string dirPath)
         {
             _storePath = Path.GetFullPath(dirPath);
 
-            _logSettings = new LogSettings()
-            {
-                LogDevice = new ManagedLocalStorageDevice(Path.Combine(_storePath, "LOG")),
-                ObjectLogDevice = new ManagedLocalStorageDevice(Path.Combine(_storePath, "DATA")),
-            };
+            _logDevice = Devices.CreateLogDevice(Path.Combine(_storePath, "LOG"), recoverDevice: true);
+            _objLogDevice = Devices.CreateLogDevice(Path.Combine(_storePath, "DATA"), recoverDevice: true);
 
-            _checkpointSettings = new CheckpointSettings()
+            var logSettings = new LogSettings()
             {
-                CheckpointManager = new DeviceLogCommitCheckpointManager(
-                    new LocalStorageNamedDeviceFactory(),
-                    new NeoCheckpointNamingScheme(_storePath),
-                    removeOutdated: false),
+                LogDevice = _logDevice,
+                ObjectLogDevice = _objLogDevice,
             };
 
             _store = new
             (
                 1L << 20,
-                _logSettings,
-                _checkpointSettings,
-                serializerSettings: new SerializerSettings<byte[], byte[]>()
+                logSettings,
+                checkpointSettings: new CheckpointSettings()
                 {
-                    keySerializer = () => new ByteArrayBinaryObjectSerializer(),
-                    valueSerializer = () => new ByteArrayBinaryObjectSerializer(),
+                    CheckpointDir = Path.Combine(_storePath, "data", NeoExpressConfigurationDefaults.CheckpointDirectoryName),
                 },
-                comparer: new ByteArrayFasterEqualityComparer(),
                 tryRecoverLatest: true
             );
 
-            _sessionPool = new AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, ByteArrayFunctions>>
+            _sessionPool = new AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, SimpleFunctions<byte[], byte[]>>>
             (
-                _logSettings.LogDevice.ThrottleLimit,
-                () => _store.For(new ByteArrayFunctions()).NewSession<ByteArrayFunctions>()
+                _logDevice.ThrottleLimit,
+                () => _store.For(new ByteArrayFunctions()).NewSession<SimpleFunctions<byte[], byte[]>>()
             );
         }
 
         public void Dispose()
         {
-            TryFullCheckpointAsync().AsTask().GetAwaiter().GetResult();
+            _ = _store.TryInitiateFullCheckpoint(out _, CheckpointType.FoldOver);
             _store.Dispose();
+            _logDevice.Dispose();
+            _objLogDevice.Dispose();
             _sessionPool.Dispose();
             GC.SuppressFinalize(this);
-        }
-
-        public async ValueTask<bool> TryFullCheckpointAsync(CheckpointType checkpointType = CheckpointType.FoldOver, CancellationToken cancellationToken = default)
-        {
-            if (_store.TryInitiateFullCheckpoint(out _, checkpointType))
-            {
-                await _store.CompleteCheckpointAsync(cancellationToken);
-                return true;
-            }
-            return false;
         }
 
         public void Restore(Guid checkpointToken)
         {
             _store.Recover(checkpointToken);
-        }
-
-        public IEnumerable<Guid> GetLogCheckpointTokens()
-        {
-            var checkpointManager = _checkpointSettings.CheckpointManager;
-            return checkpointManager.GetLogCheckpointTokens();
         }
 
         public void Reset()
@@ -106,38 +85,38 @@ namespace Neo.Express.Storage.FasterDb
         public void Delete(byte[] key)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var status = session.Delete(key);
 
             if (status.IsPending)
-                session.CompletePending(true, true);
+                session.CompletePending(true);
             _sessionPool.Return(session);
         }
 
         public ISnapshot GetSnapshot()
         {
-            if (_store.TryInitiateFullCheckpoint(out var snapshotId, CheckpointType.Snapshot))
-                _store.CompleteCheckpointAsync().AsTask().GetAwaiter().GetResult();
-            return new FasterSnapshot(this, _storePath, _checkpointSettings, snapshotId, _sessionPool);
+            if (_store.TryInitiateHybridLogCheckpoint(out var snapshotId, CheckpointType.FoldOver))
+                _store.CompleteCheckpointAsync().GetAwaiter().GetResult();
+            return new FasterSnapshot(this, _storePath, snapshotId, _sessionPool);
         }
 
         public void Put(byte[] key, byte[] value)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var status = session.Upsert(key, value);
 
             if (status.IsPending)
-                session.CompletePending(true, true);
+                session.CompletePending(true);
             _sessionPool.Return(session);
         }
 
         public IEnumerable<(byte[] Key, byte[] Value)> Seek(byte[] keyOrPrefix, SeekDirection direction)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var keyComparer = direction == SeekDirection.Forward ? ByteArrayComparer.Default : ByteArrayComparer.Reverse;
             var list = new List<(byte[] Key, byte[] Value)>();
@@ -163,7 +142,7 @@ namespace Neo.Express.Storage.FasterDb
         public byte[]? TryGet(byte[] key)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var (status, output) = session.Read(key);
             byte[]? value = null;
@@ -192,7 +171,7 @@ namespace Neo.Express.Storage.FasterDb
         public IEnumerator<KeyValuePair<byte[], byte[]>> GetEnumerator()
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             using var iter = session.Iterate();
             while (iter.GetNext(out _))

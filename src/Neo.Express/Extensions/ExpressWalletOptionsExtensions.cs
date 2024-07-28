@@ -16,14 +16,11 @@ namespace Neo.Express.Extensions
 {
     internal static class ExpressWalletOptionsExtensions
     {
-        public static ExpressWallet GetWallet(this ExpressWalletOptions expressWalletOptions, ProtocolSettings protocolSettings)
+        public static ExpressWallet ToWallet(this ExpressWalletOptions expressWalletOptions, ProtocolSettings protocolSettings)
         {
-            var wallet = new ExpressWallet(expressWalletOptions.Name, protocolSettings);
-            foreach (var account in expressWalletOptions.Accounts.OrderBy(o => o.IsDefault))
-            {
-                wallet.CreateAccount(Convert.FromHexString(account.PrivateKey));
-            }
-            return wallet;
+            var accounts = expressWalletOptions.Accounts
+                .Select(s => s.ToWalletAccount(protocolSettings));
+            return new(expressWalletOptions.Name, protocolSettings, accounts);
         }
     }
 }

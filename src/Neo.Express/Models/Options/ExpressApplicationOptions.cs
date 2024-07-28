@@ -17,11 +17,18 @@ namespace Neo.Express.Models.Options
         {
             internal sealed class BlockchainStorageOptions
             {
-                public string? Path { get; set; }
+                public string Path { get; set; } = string.Empty;
+                public string CheckpointPath { get; set; } = string.Empty;
+            }
+
+            internal sealed class NodeOptions
+            {
+                public uint MillisecondsPerBlock { get; set; }
+                public int Index { get; set; }
             }
 
             public BlockchainStorageOptions Storage { get; set; } = new();
-            public uint MillisecondsPerBlock { get; set; }
+            public NodeOptions Node { get; set; } = new();
         }
 
         public BlockchainOptions Blockchain { get; set; } = new();

@@ -10,6 +10,7 @@
 // modifications are permitted.
 
 using FASTER.core;
+using Neo.Express.Hosting;
 using Neo.Persistence;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -18,59 +19,45 @@ namespace Neo.Express.Storage.FasterDb
 {
     internal sealed class FasterSnapshot : ISnapshot, IEnumerable<KeyValuePair<byte[], byte[]>>
     {
-        private readonly ICheckpointManager _snapshotCheckpointManager;
         private readonly FasterKV<byte[], byte[]> _snapshot;
         private readonly FasterStore _db;
 
         private readonly Guid _snapshotId;
 
-        private readonly AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, ByteArrayFunctions>> _sessionPool;
+        private readonly AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, SimpleFunctions<byte[], byte[]>>> _sessionPool;
         private readonly ConcurrentDictionary<byte[], byte[]?> _writeBatch;
 
         public FasterSnapshot(
             FasterStore store,
             string storePath,
-            CheckpointSettings checkpointSettings,
             Guid snapshotId,
-            AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, ByteArrayFunctions>> sessionPool)
+            AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, SimpleFunctions<byte[], byte[]>>> sessionPool)
         {
             _db = store;
             _snapshotId = snapshotId;
             _writeBatch = new ConcurrentDictionary<byte[], byte[]?>(ByteArrayEqualityComparer.Default);
-
-            _snapshotCheckpointManager = checkpointSettings.CheckpointManager;
-
-            var snapshotLogSettings = new LogSettings()
-            {
-                LogDevice = new NullDevice(),
-                ObjectLogDevice = new NullDevice(),
-            };
+            _sessionPool = sessionPool;
 
             _snapshot = new
             (
                 1 << 20,
-                snapshotLogSettings,
-                checkpointSettings,
-                serializerSettings: new SerializerSettings<byte[], byte[]>()
+                new LogSettings()
                 {
-                    keySerializer = () => new ByteArrayBinaryObjectSerializer(),
-                    valueSerializer = () => new ByteArrayBinaryObjectSerializer(),
+                    LogDevice = new NullDevice(),
+                    ObjectLogDevice = new NullDevice(),
                 },
-                comparer: new ByteArrayFasterEqualityComparer()
+                checkpointSettings: new CheckpointSettings()
+                {
+                    CheckpointDir = Path.Combine(storePath, "data", NeoExpressConfigurationDefaults.CheckpointDirectoryName),
+                    RemoveOutdated = true,
+                }
             );
 
-            _snapshot.Recover(snapshotId);
-
-            _sessionPool = new AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, ByteArrayFunctions>>
-            (
-                snapshotLogSettings.LogDevice.ThrottleLimit,
-                () => _snapshot.For(new ByteArrayFunctions()).NewSession<ByteArrayFunctions>()
-            );
+            _snapshot.Recover(snapshotId, undoNextVersion: false);
         }
 
         public void Dispose()
         {
-            _snapshotCheckpointManager.Purge(_snapshotId);
             _snapshot.Dispose();
             GC.SuppressFinalize(this);
         }

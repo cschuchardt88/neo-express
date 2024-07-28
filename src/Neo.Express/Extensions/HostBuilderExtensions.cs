@@ -11,6 +11,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Neo.Express.Hosting.Services;
 using Neo.Express.Hosting.Setup;
 using System.CommandLine.Invocation;
 using System.Diagnostics.CodeAnalysis;
@@ -48,6 +49,7 @@ namespace Neo.Express.Extensions
             {
                 services.ConfigureOptions<ExpressChainOptionsSetup>();
                 services.ConfigureOptions<ExpressApplicationOptionsSetup>();
+                services.AddHostedService<NeoSystemHostedService>();
             });
 
             return hostBuilder;

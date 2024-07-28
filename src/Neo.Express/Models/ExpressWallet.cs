@@ -24,6 +24,18 @@ namespace Neo.Express.Models
 
         private readonly ConcurrentDictionary<UInt160, ExpressWalletAccount> _accounts = new();
 
+        public ExpressWallet(
+            string name,
+            ProtocolSettings protocolSettings,
+            IEnumerable<ExpressWalletAccount> accounts) : this(name, protocolSettings)
+        {
+            if (accounts is not null)
+            {
+                foreach (var account in accounts)
+                    _ = _accounts.TryAdd(account.ScriptHash, account);
+            }
+        }
+
         public override bool Contains(UInt160 scriptHash) =>
             _accounts.ContainsKey(scriptHash);
 
