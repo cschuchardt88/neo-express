@@ -49,7 +49,7 @@ namespace Neo.Express.Storage.FasterDb
                 checkpointSettings: new CheckpointSettings()
                 {
                     CheckpointDir = Path.Combine(storePath, "data", NeoExpressConfigurationDefaults.CheckpointDirectoryName),
-                    RemoveOutdated = true,
+                    RemoveOutdated = false,
                 }
             );
 
@@ -91,7 +91,7 @@ namespace Neo.Express.Storage.FasterDb
         public IEnumerable<(byte[] Key, byte[] Value)> Seek(byte[] keyOrPrefix, SeekDirection direction)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var keyComparer = direction == SeekDirection.Forward ? ByteArrayComparer.Default : ByteArrayComparer.Reverse;
             var list = new List<(byte[] Key, byte[] Value)>();
@@ -117,7 +117,7 @@ namespace Neo.Express.Storage.FasterDb
         public byte[]? TryGet(byte[] key)
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             var (status, output) = session.Read(key);
             byte[]? value = null;
@@ -146,7 +146,7 @@ namespace Neo.Express.Storage.FasterDb
         public IEnumerator<KeyValuePair<byte[], byte[]>> GetEnumerator()
         {
             if (_sessionPool.TryGet(out var session) == false)
-                session = _sessionPool.GetAsync().AsTask().GetAwaiter().GetResult();
+                session = _sessionPool.GetAsync().GetAwaiter().GetResult();
 
             using var iter = session.Iterate();
             while (iter.GetNext(out _))

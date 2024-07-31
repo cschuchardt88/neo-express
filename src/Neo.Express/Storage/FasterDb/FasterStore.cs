@@ -46,6 +46,7 @@ namespace Neo.Express.Storage.FasterDb
                 checkpointSettings: new CheckpointSettings()
                 {
                     CheckpointDir = Path.Combine(_storePath, "data", NeoExpressConfigurationDefaults.CheckpointDirectoryName),
+                    RemoveOutdated = false
                 },
                 tryRecoverLatest: true
             );
@@ -53,13 +54,14 @@ namespace Neo.Express.Storage.FasterDb
             _sessionPool = new AsyncPool<ClientSession<byte[], byte[], byte[], byte[], Empty, SimpleFunctions<byte[], byte[]>>>
             (
                 _logDevice.ThrottleLimit,
-                () => _store.For(new ByteArrayFunctions()).NewSession<SimpleFunctions<byte[], byte[]>>()
+                () => _store.For(new SimpleFunctions<byte[], byte[]>()).NewSession<SimpleFunctions<byte[], byte[]>>()
             );
         }
 
         public void Dispose()
         {
             _ = _store.TryInitiateFullCheckpoint(out _, CheckpointType.FoldOver);
+            _store.CompleteCheckpointAsync().GetAwaiter().GetResult();
             _store.Dispose();
             _logDevice.Dispose();
             _objLogDevice.Dispose();
