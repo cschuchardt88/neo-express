@@ -58,7 +58,7 @@
                 "type": "object",
                 "description": "Either { \"trace-file\": \"<path>\" } to replay a recorded .neo-trace, or { \"operation\": \"<method>\", \"args\": [ ... ] } to deploy and run the contract live."
               },
-              "return-types": {
+              "returnTypes": {
                 "type": "array",
                 "items": {
                   "type": "string",

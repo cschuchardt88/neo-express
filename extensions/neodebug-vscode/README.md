@@ -27,7 +27,7 @@ Add a configuration to `.vscode/launch.json`. Replay a recorded trace (supports 
   "request": "launch",
   "program": "${workspaceFolder}/bin/sc/Contract.nef",
   "invocation": { "trace-file": "${workspaceFolder}/traces/transaction.neo-trace" },
-  "return-types": [ "int" ]
+  "returnTypes": [ "int" ]
 }
 ```
 
