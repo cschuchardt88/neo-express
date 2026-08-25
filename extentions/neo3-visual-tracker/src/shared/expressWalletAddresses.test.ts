@@ -1,0 +1,91 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  contractsWithStandard,
+  isHiddenExpressConfig,
+  parseExpressWalletAddresses,
+  workspaceWalletDisplayName,
+} from "./expressWalletAddresses";
+
+test("parseExpressWalletAddresses includes genesis, node wallets, and user wallets", () => {
+  const addresses = parseExpressWalletAddresses({
+    wallets: [
+      {
+        name: "alice",
+        accounts: [
+          {
+            "script-hash": "Nalice",
+            "is-default": true,
+            label: null,
+          },
+        ],
+      },
+    ],
+    "consensus-nodes": [
+      {
+        wallet: {
+          name: "node1",
+          accounts: [
+            {
+              "script-hash": "Nnode1",
+              "is-default": true,
+              label: null,
+            },
+            {
+              "script-hash": "Ngenesis",
+              "is-default": false,
+              label: "Consensus MultiSigContract",
+            },
+          ],
+        },
+      },
+    ],
+  });
+  assert.deepEqual(addresses, {
+    alice: "Nalice",
+    node1: "Nnode1",
+    genesis: "Ngenesis",
+  });
+});
+
+test("workspaceWalletDisplayName uses the file name for Default account labels", () => {
+  assert.equal(
+    workspaceWalletDisplayName(
+      "/workspace/wallets/alice.neo-wallet.json",
+      "Default account"
+    ),
+    "alice"
+  );
+  assert.equal(
+    workspaceWalletDisplayName("/wallets/ops.json", "Cold storage"),
+    "Cold storage"
+  );
+});
+
+test("hides nested test neo-express files from the blockchain list", () => {
+  assert.equal(
+    isHiddenExpressConfig(
+      "/workspace/contracts/SampleToken/test/default.neo-express"
+    ),
+    true
+  );
+  assert.equal(
+    isHiddenExpressConfig("/workspace/default.neo-express"),
+    false
+  );
+});
+
+test("contractsWithStandard lists NEP-17 names and skips hashes", () => {
+  assert.deepEqual(
+    contractsWithStandard(
+      {
+        Nep17Contract: { supportedstandards: ["NEP-17"] },
+        "0xabc": { supportedstandards: ["NEP-17"] },
+        Nep11Contract: { supportedstandards: ["NEP-11"] },
+      },
+      "NEP-17"
+    ),
+    ["Nep17Contract"]
+  );
+});
