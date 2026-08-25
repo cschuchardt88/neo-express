@@ -171,7 +171,8 @@ namespace NeoExpress.Commands
                                     cmd.Model.Password,
                                     cmd.Model.WitnessScope,
                                     cmd.Model.Data,
-                                    cmd.Model.Force).ConfigureAwait(false);
+                                    cmd.Model.Force,
+                                    1m).ConfigureAwait(false);
                                 break;
                             }
                         case CommandLineApplication<BatchFileCommands.Contract.Download> cmd:

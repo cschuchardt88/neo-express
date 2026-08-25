@@ -192,7 +192,7 @@ namespace NeoExpress.Node
             const long maxSafeGas = long.MaxValue / 10_000;
             var maxGas = balance.Amount > maxSafeGas ? maxSafeGas : (long)balance.Amount;
             var tx = wallet.MakeTransaction(neoSystem.StoreView, script, accountHash, new[] { signer }, maxGas: maxGas);
-            tx.SystemFee += NodeUtility.AdditionalGasSystemFee(additionalGas);
+            tx.SystemFee += NodeUtility.SystemFeeBuffer(additionalGas);
 
             var context = new ContractParametersContext(neoSystem.StoreView, tx, ProtocolSettings.Network);
             var account = wallet.GetAccount(accountHash)

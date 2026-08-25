@@ -423,3 +423,5 @@ src/worknet/default.neo-worknet
 src/worknet/data/*
 src/neoxp/Properties/launchSettings.json
 .worktrees/
+
+**/.neoxp.deploy.touch

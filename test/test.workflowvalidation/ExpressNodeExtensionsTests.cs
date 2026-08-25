@@ -267,7 +267,10 @@ public class ExpressNodeExtensionsTests
             return Task.FromResult<Block>(null!);
         }
 
-        public Task<(Transaction tx, RpcApplicationLog? appLog)> GetTransactionAsync(UInt256 txHash) => throw new NotSupportedException();
+        public RpcApplicationLog? TransactionLog { get; set; }
+
+        public Task<(Transaction tx, RpcApplicationLog? appLog)> GetTransactionAsync(UInt256 txHash)
+            => Task.FromResult<(Transaction tx, RpcApplicationLog? appLog)>((null!, TransactionLog));
 
         public Task<uint> GetTransactionHeightAsync(UInt256 txHash) => throw new NotSupportedException();
 
