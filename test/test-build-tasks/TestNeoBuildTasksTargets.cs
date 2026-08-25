@@ -106,7 +106,9 @@ namespace build_tasks
             }
             finally
             {
-                try { temp.Delete(true); } catch { }
+                try
+                { temp.Delete(true); }
+                catch { }
             }
         }
     }
