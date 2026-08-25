@@ -4,8 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 
 const templatesSource = readFileSync(join(__dirname, "templates.ts"), "utf8");
-const createContractSource = readFileSync(
-  join(__dirname, "../../panel/components/quickStart/CreateContract.tsx"),
+const startersSource = readFileSync(
+  join(__dirname, "csharpStarters.ts"),
   "utf8"
 );
 
@@ -20,9 +20,10 @@ test("New contract wizard asks for a C# starter after language", () => {
   );
 });
 
-test("Quick Start new-contract copy mentions official C# starters", () => {
-  assert.match(createContractSource, /NEP-17/);
-  assert.match(createContractSource, /NEP-11/);
-  assert.match(createContractSource, /Oracle/);
-  assert.match(createContractSource, /Ownable/);
+test("C# wizard starters include official Neo.SmartContract.Template overlays", () => {
+  assert.match(startersSource, /NEP-17/);
+  assert.match(startersSource, /NEP-11/);
+  assert.match(startersSource, /Oracle/);
+  assert.match(startersSource, /Ownable/);
+  assert.match(startersSource, /overlay: true/);
 });
