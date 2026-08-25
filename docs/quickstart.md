@@ -1,125 +1,173 @@
 <!-- markdownlint-enable -->
-# Neo Express quickstart
 
-A longer CLI walkthrough: install, create a chain, compile a C# contract, deploy, and invoke.
-For the shortest path (including VS Code), start at [getting-started.md](getting-started.md).
+# NeoExpress Quickstart
 
-Works on Windows, macOS, and Ubuntu.
+This article is divided into the following sections: 
 
-## 1. Install Neo Express
+[Setting up a private chain using NeoExpress](#setting-up-a-private-chain-using-neoexpress)
 
-### .NET tool (recommended)
+[Writing and compiling smart contracts with NeoDevpackDotnet](#writing-and-compiling-smart-contracts-with-neodevpackdotnet)
 
-Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+[Deploying and invoking smart contracts using NeoExpress](#deploying-and-invoking-smart-contracts-using-NeoExpress)
 
-```shell
-dotnet tool install Neo.Express -g
-neoxp --version
-```
+The following steps are applicable to multiple system platforms, such as Windows, macOS, and Ubuntu.
 
-### Release package
+## Setting up a private chain using NeoExpress
 
-1. Download the latest build from [neo-express releases](https://github.com/neo-project/neo-express/releases/latest).
-2. Unzip it.
-3. Run `neoxp` (`neoxp.exe` on Windows) from that directory.
+### Install NeoExpress via Release Package
 
-Platform libraries (RocksDB) are listed in [installation.md](installation.md).
+1. Download the latest release package from [neo-express releases](https://github.com/neo-project/neo-express/releases) for your operating system.
+2. Unzip the package on your local machine.
+3. Run the `neoxp.exe` command in the terminal from the directory where you unzipped the package
 
-## 2. Create and use a private chain
+### Usage Guide
 
-```shell
-neoxp create
-neoxp wallet list
-neoxp show balances genesis
-neoxp transfer 1 gas genesis node1
-neoxp run --seconds-per-block 1
-```
+- Create a new local Neo network:
 
-`genesis` is the consensus multi-sig that holds the genesis NEO and GAS. `node1` is the
-default consensus-node wallet.
+  ```shell
+  .\neoxp create
+  ```
 
-Leave `neoxp run` going. Other commands use a second terminal in the same folder
-(where `default.neo-express` lives).
+  Use this command to create a single node private chain (local blockchain network) creating both genesis wallet and node1 wallet. 
 
-Full command list: [command-reference.md](command-reference.md).
+- List all wallets:
 
-## 3. Compile a C# contract
+  ```shell
+  .\neoxp wallet list
+  ```
 
-This repo already has Express-ready starters. From the repository root:
+  The `wallet list` command writes out a list of all the wallets - including consensus node wallets - 
+  along with their account addresses, private and public keys.
 
-```shell
-dotnet build samples/examples/Nep17
-```
+- Show genesis account balance:
 
-That:
+  `genesis` to use the consensus node multi-sig account which holds the genesis NEO and GAS.
 
-- restores local `neoxp` and `nccs` tools
-- compiles `Nep17Contract.nef` / `.manifest.json` to `samples/examples/Nep17/bin/sc`
-- creates `default.neo-express` next to the example if it is missing
-- resets the chain and deploys with `genesis` (`express.batch`)
+  ```shell
+  .\neoxp show balances genesis
+  ```
 
-| Starter | Path |
-| ------- | ---- |
-| Blank | `samples/examples/Blank` |
-| NEP-17 token | `samples/examples/Nep17` |
-| NEP-11 NFT | `samples/examples/Nep11` |
-| Oracle | `samples/examples/Oracle` |
-| Ownable | `samples/examples/Ownable` |
+- Send 1 gas from genesis account to node1 account:
 
-Details: [samples/examples/README.md](../samples/examples/README.md).
+  ```shell
+  .\neoxp transfer 1 gas genesis node1
+  ```
 
-### Create your own contract
+Please review the [Command Reference](command-reference.md) to get an understanding of Neo-Express capabilities.
 
-**VS Code:** Quick Start / Smart contracts → **New contract** → C# → pick Blank, NEP-17,
-NEP-11, Oracle, Ownable, or Storage.
+## Writing and compiling smart contracts with NeoDevpackDotnet
 
-**Terminal:** install [Neo.SmartContract.Template](https://www.nuget.org/packages/Neo.SmartContract.Template)
-and add `Neo.BuildTasks` like the examples, or copy an example folder:
+We have completed setting up the private chain and configuring the node. In this section we will walk you through configuring the environment, writing, and compiling an NEP17 contract using C#.
+
+## Installing tools
+
+Download and install [Visual Studio Code](https://code.visualstudio.com/Download)
+
+1. Download and install [.NET 10.0 SDK](https://dotnet.microsoft.com/download)
+
+2. Run the command line and enter the following command to check if you have installed SDK successfully.
+
+   ```shell
+   dotnet --list-sdks
+   ```
+
+   If there is no issue the SDK version number is displayed.
+
+## Installing contract template
+
+[Neo.SmartContract.Template](https://www.nuget.org/packages/Neo.SmartContract.Template) is a project template used when developing Neo smart contracts. After installing the template, you can create a Neo smart contract project using either the Terminal or Visual Studio.
+
+Install the template
 
 ```shell
 dotnet new install Neo.SmartContract.Template
-dotnet new neocontractnep17 -n MyToken -o ./MyToken
 ```
 
-`dotnet build` on an example project runs `nccs` through `Neo.BuildTasks`. You can also run
-`nccs` yourself after `dotnet tool install Neo.Compiler.CSharp -g`. Output is `bin/sc/*.nef`.
-
-## 4. Deploy and invoke
-
-If you used `samples/examples/*`, the first `dotnet build` already deployed. With `neoxp run`
-in another terminal:
+List all dotnet templates
 
 ```shell
-neoxp contract run Nep17Contract symbol --results
+dotnet new list
 ```
 
-`--results` is a dry run. To submit a transaction:
+These default templates are available after installing [Neo.SmartContract.Template](https://www.nuget.org/packages/Neo.SmartContract.Template):
+
+- neocontractowner - Standard contract template with the Owner, including the GetOwner and SetOwner methods.
+- neocontractoracle - A contract template using OracleRequest.
+- neocontractnep17 - NEP-17 contract template, including the Mint and Burn methods.
+
+More Neo.SmartContract.Template information can be found [here](https://docs.neo.org/docs/n3/develop/write/1_dotnet.html#neosmartcontracttemplate).
+
+### Create a project using templates with Terminal
 
 ```shell
-neoxp contract run Nep17Contract symbol --account genesis
+dotnet new neocontractnep17 
 ```
 
-Deploy a `.nef` you compiled yourself:
+The project name defaults to the name of the current directory. You can also specify the project name with `-n, --name <name>`, e.g. `dotnet new neocontractnep17 -n MyFirstContract`.
+
+## Neo.Compiler.CSharp
+
+[Neo.Compiler.CSharp](https://www.nuget.org/packages/Neo.Compiler.CSharp) (nccs) is the Neo smart contract compiler that compiles the C# language into NeoVM executable OpCodes.
+
+### Install the compiler
+
+```undefined
+dotnet tool install --global Neo.Compiler.CSharp
+```
+
+### Compile the contract file with Terminal
+
+In the Terminal interface, go to the project path and run the following command to build your contract：
 
 ```shell
-neoxp contract deploy ./src/bin/sc/MyToken.nef genesis
+dotnet build
 ```
 
-Reusable calls belong in a `.neo-invoke.json` file:
+or
 
 ```shell
-neoxp contract invoke ./invoke-files/contract.neo-invoke.json genesis
+nccs
 ```
 
-See [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
+Related contract files are outputted under `bin\sc` path in the contract project directory.
 
-## 5. Rebuild so the contract redeploys
+More Neo.Compiler.CSharp information can be found [here](https://docs.neo.org/docs/n3/develop/write/1_dotnet.html#neocompilercsharp).
 
-`Neo.BuildTasks` skips the Express batch when the `.nef` has not changed. After **Clean**
-or **Rebuild**, the stamp is deleted and the next build resets the chain and deploys again:
+## Deploying and invoking smart contracts using NeoExpress
+
+Copy the smart contract file, include `*.nef` and `*.manifest.json` to the neoxp directory.
+
+### Deploy
+
+Run the following command. Note: please replace `hello.nef` with the name of your contract file.
 
 ```shell
-dotnet rebuild samples/examples/Nep17
+> .\neoxp contract deploy hello.nef genesis
+Deployment of hello (0x4e97b0370712bf9f5f0bbb7beb5e4127fac55040) Transaction 0x5933870616f13ceb41462fbae1d460edf998defda9d5c3f074ad785465130cf7 submitted
 ```
 
-Checkpoint-backed `dotnet test` workflow: [contract-testing.md](contract-testing.md).
+### Invoke
+
+To invoke a smart contract, use the `neoxp` run command, see [here](command-reference.md#neoxp-contract-run).
+
+The --results option indicates a trial run, which queries the results of the execution without sending a contract.
+
+```
+> .\neoxp contract run 0x4e97b0370712bf9f5f0bbb7beb5e4127fac55040 symbol --results
+VM State:     HALT
+Gas Consumed: 1364220
+Result Stack:
+  4558414d504c45(EXAMPLE)
+```
+
+"EXAMPLE" is the symbol of our test contract. 
+
+4558414d504c45 is hexadecimal little-endian string of "EXAMPLE".
+
+If we want to call the contract and send the transaction, we can execute it:
+
+```shell
+> .\neoxp contract run 0x4e97b0370712bf9f5f0bbb7beb5e4127fac55040 symbol --account genesis
+Invocation Transaction 0x1bf5b40cf217c278c331e915f6fc0e0164c7ae84113375947a529e3f2ae8411b submitted
+```
+
