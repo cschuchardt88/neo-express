@@ -24,6 +24,13 @@ public class AdditionalGasTests
         NodeUtility.AdditionalGasSystemFee(1.5m).Should().Be(150_000_000L);
     }
 
+    [Fact]
+    public void SystemFeeBuffer_pads_invokescript_estimates_and_adds_requested_gas()
+    {
+        NodeUtility.SystemFeeBuffer(0m).Should().Be(NodeUtility.InvokeEstimatePadDatoshi);
+        NodeUtility.SystemFeeBuffer(1m).Should().Be(100_000_000L + NodeUtility.InvokeEstimatePadDatoshi);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

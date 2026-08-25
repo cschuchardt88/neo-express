@@ -5,7 +5,22 @@ A source-level, time-travel debugger for Neo N3 smart contracts. This extension 
 tool (the `Neo.Debug` global tool) as a [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
 host.
 
+Repo-wide walkthrough: [Getting started](../../docs/getting-started.md#debugger).
+Launch-configuration schema: [debugger-command-reference.md](../../docs/debugger-command-reference.md).
+
+## Getting started
+
+1. Install [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+2. `dotnet tool install Neo.Debug -g`
+3. Build a contract that emits `.nef` and `.nefdbgnfo` (for example
+   `dotnet build samples/examples/Nep17`).
+4. Add a `neo-contract` configuration to `.vscode/launch.json` (see below).
+5. Set breakpoints in the C# source and start debugging.
+
 ## Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Visual Studio Code 1.104 or later
 
 Install the debugger tool:
 
@@ -44,8 +59,8 @@ Add a configuration to `.vscode/launch.json`. Replay a recorded trace (supports 
 ```
 
 Set breakpoints in your C# source, then start debugging. See the
-[NeoDebug command reference](../../docs/debugger-command-reference.md) for the full launch-configuration
-schema, the source/disassembly views, and debug-console expression evaluation.
+[debugger command reference](../../docs/debugger-command-reference.md) for the full launch-configuration
+schema (`return-types`, `sourceFileMap`, `debug-view`).
 
 ## Packaging
 

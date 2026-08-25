@@ -91,10 +91,11 @@ namespace NeoExpress
             var txHash = await expressNode
                 .UpdateAsync(scriptHash, nefFile, manifest, wallet, accountHash, witnessScope, data)
                 .ConfigureAwait(false);
+            await expressNode.EnsureTransactionSucceededAsync(txHash).ConfigureAwait(false);
             await writer.WriteTxHashAsync(txHash, "Update", json).ConfigureAwait(false);
         }
 
-        public async Task ContractDeployAsync(string contract, string accountName, string password, WitnessScope witnessScope, string data, bool force)
+        public async Task ContractDeployAsync(string contract, string accountName, string password, WitnessScope witnessScope, string data, bool force, decimal additionalGas = 1m)
         {
             if (!chainManager.TryGetSigningAccount(accountName, password, out var wallet, out var accountHash))
             {
@@ -102,11 +103,34 @@ namespace NeoExpress
             }
 
             var (nefFile, manifest) = await fileSystem.LoadContractAsync(contract).ConfigureAwait(false);
+            var contractHash = Neo.SmartContract.Helper.GetContractHash(accountHash, nefFile.CheckSum, manifest.Name);
+            var existing = await expressNode.ListContractsAsync(manifest.Name).ConfigureAwait(false);
+            if (existing.Any(candidate => candidate.hash == contractHash))
+            {
+                var onChainManifest = existing.First(candidate => candidate.hash == contractHash).manifest;
+                if (!ExpressNodeExtensions.HasUpdateMethod(onChainManifest))
+                {
+                    throw new Exception(
+                        $"Contract {manifest.Name} ({contractHash}) is already deployed and has no update method. " +
+                        "Restore a checkpoint or reset the chain to remove it, then deploy again.");
+                }
+                if (!force)
+                {
+                    throw new Exception($"Contract named {manifest.Name} already deployed. Use --force to update the existing contract.");
+                }
+
+                var updateTxHash = await expressNode
+                    .UpdateAsync(contractHash, nefFile, manifest, wallet, accountHash, witnessScope,
+                        string.IsNullOrEmpty(data) ? null : data)
+                    .ConfigureAwait(false);
+                await expressNode.EnsureTransactionSucceededAsync(updateTxHash).ConfigureAwait(false);
+                await WriteDeployResultAsync(manifest.Name, contractHash, updateTxHash, "Update").ConfigureAwait(false);
+                return;
+            }
 
             if (!force)
             {
-                var contracts = await expressNode.ListContractsAsync(manifest.Name).ConfigureAwait(false);
-                if (contracts.Count > 0)
+                if (existing.Count > 0)
                 {
                     throw new Exception($"Contract named {manifest.Name} already deployed. Use --force to deploy contract with conflicting name.");
                 }
@@ -194,25 +218,31 @@ namespace NeoExpress
             }
 
             var txHash = await expressNode
-                .DeployAsync(nefFile, manifest, wallet, accountHash, witnessScope, dataParam)
+                .DeployAsync(nefFile, manifest, wallet, accountHash, witnessScope, dataParam, additionalGas)
                 .ConfigureAwait(false);
+            await expressNode.EnsureTransactionSucceededAsync(txHash).ConfigureAwait(false);
+            await WriteDeployResultAsync(manifest.Name, contractHash, txHash, "Deployment").ConfigureAwait(false);
+        }
 
-            var contractHash = Neo.SmartContract.Helper.GetContractHash(accountHash, nefFile.CheckSum, manifest.Name);
+        private async Task WriteDeployResultAsync(string name, UInt160 contractHash, UInt256 txHash, string action)
+        {
             if (json)
             {
                 using var jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented };
                 await jsonWriter.WriteStartObjectAsync().ConfigureAwait(false);
                 await jsonWriter.WritePropertyNameAsync("contract-name").ConfigureAwait(false);
-                await jsonWriter.WriteValueAsync(manifest.Name).ConfigureAwait(false);
+                await jsonWriter.WriteValueAsync(name).ConfigureAwait(false);
                 await jsonWriter.WritePropertyNameAsync("contract-hash").ConfigureAwait(false);
                 await jsonWriter.WriteValueAsync($"{contractHash}").ConfigureAwait(false);
                 await jsonWriter.WritePropertyNameAsync("tx-hash").ConfigureAwait(false);
                 await jsonWriter.WriteValueAsync($"{txHash}").ConfigureAwait(false);
+                await jsonWriter.WritePropertyNameAsync("action").ConfigureAwait(false);
+                await jsonWriter.WriteValueAsync(action).ConfigureAwait(false);
                 await jsonWriter.WriteEndObjectAsync().ConfigureAwait(false);
             }
             else
             {
-                await writer.WriteLineAsync($"Deployment of {manifest.Name} ({contractHash}) Transaction {txHash} submitted").ConfigureAwait(false);
+                await writer.WriteLineAsync($"{action} of {name} ({contractHash}) Transaction {txHash} submitted").ConfigureAwait(false);
             }
         }
 

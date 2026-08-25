@@ -10,7 +10,7 @@
     "url": "https://github.com/neo-project/neo-express.git"
   },
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.104.0"
   },
   "categories": [
     "Debuggers"
@@ -52,7 +52,7 @@
               "program": {
                 "type": "string",
                 "description": "Absolute path to the compiled .nef file. Its sibling .manifest.json and .nefdbgnfo/.debug.json are loaded automatically.",
-                "default": "${workspaceFolder}/bin/sc/Contract.nef"
+                "default": "${workspaceFolder}/bin/sc/contract.nef"
               },
               "invocation": {
                 "type": "object",

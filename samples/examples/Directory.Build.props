@@ -1,0 +1,59 @@
+<Project>
+  <PropertyGroup>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TargetFramework>net10.0</TargetFramework>
+    <NeoTestVersion>3.10.1</NeoTestVersion>
+    <NeoExpressInputFile>default.neo-express</NeoExpressInputFile>
+    <NeoExpressDeployStamp>$(IntermediateOutputPath)$(NeoContractName).neoxp.deploy.touch</NeoExpressDeployStamp>
+    <DefaultItemExcludes>$(DefaultItemExcludes);src\obj\**;src\bin\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Neo.SmartContract.Framework" Version="$(NeoTestVersion)" />
+    <PackageReference Include="Neo.BuildTasks" Version="$(NeoTestVersion)" PrivateAssets="all" />
+  </ItemGroup>
+  <Target Name="CreateNeoExpressInstance"
+          Condition="'$(NeoContractName)'!='' and !Exists('$(MSBuildProjectDirectory)\$(NeoExpressInputFile)')"
+          AfterTargets="ExecuteNeoCsc"
+          BeforeTargets="DeployContractToNeoExpress">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet tool restore" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet tool run neoxp -- create -o $(NeoExpressInputFile)" />
+  </Target>
+  <!-- Deploy after compile with contract deploy so a running local neo-express instance works.
+       Offline batch reset cannot run while the chain is up. -->
+  <Target Name="DeployContractToNeoExpress"
+          AfterTargets="ExecuteNeoCsc"
+          DependsOnTargets="CreateNeoExpressInstance"
+          Condition="'$(NeoContractName)'!=''"
+          Inputs="$(MSBuildProjectDirectory)\bin\sc\$(NeoContractName).nef;$(MSBuildProjectDirectory)\$(NeoExpressInputFile)"
+          Outputs="$(NeoExpressDeployStamp)">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="dotnet tool restore" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          IgnoreExitCode="true"
+          Command="dotnet tool run neoxp -- reset -f --input $(NeoExpressInputFile)">
+      <Output TaskParameter="ExitCode" PropertyName="_NeoResetExit" />
+    </Exec>
+    <PropertyGroup>
+      <_NeoChainOffline Condition="'$(_NeoResetExit)' == '0'">true</_NeoChainOffline>
+    </PropertyGroup>
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="'$(_NeoChainOffline)' == 'true'"
+          Command="dotnet tool run neoxp -- contract deploy &quot;bin/sc/$(NeoContractName).nef&quot; genesis --input $(NeoExpressInputFile)" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="'$(_NeoChainOffline)' != 'true'"
+          IgnoreExitCode="true"
+          Command="dotnet tool run neoxp -- contract deploy &quot;bin/sc/$(NeoContractName).nef&quot; genesis --input $(NeoExpressInputFile)" />
+    <Message Importance="high"
+             Condition="'$(_NeoChainOffline)' != 'true'"
+             Text="Neo Express is running. The contract is deployed if it was new; stop the chain and rebuild to replace it." />
+    <Touch Files="$(NeoExpressDeployStamp)" AlwaysCreate="true" />
+    <ItemGroup>
+      <FileWrites Include="$(NeoExpressDeployStamp)" />
+    </ItemGroup>
+  </Target>
+  <Target Name="CleanNeoExpressDeploy"
+          BeforeTargets="CoreClean;Rebuild"
+          Condition="'$(NeoContractName)'!=''">
+    <Delete Files="$(NeoExpressDeployStamp)" TreatErrorsAsWarnings="true" />
+  </Target>
+</Project>

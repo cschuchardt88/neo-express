@@ -6,19 +6,22 @@ import getContractTreeCommand, {
   getWorkspaceContractPath,
 } from "./contractTreeCommand";
 
-test("getContractTreeCommand opens deployed contracts", () => {
-  assert.deepEqual(getContractTreeCommand({ name: "Sample", hash: "0x1234" }), {
-    command: "neo3-visual-devtracker.tracker.openContract",
-    arguments: [{ hash: "0x1234" }],
-    title: "0x1234",
+test("getContractTreeCommand opens Contract Studio for deployed contracts", () => {
+  const contract = { name: "Sample", hash: "0x1234" };
+  assert.deepEqual(getContractTreeCommand(contract), {
+    command: "neo3-visual-devtracker.neo.openContractStudio",
+    arguments: [contract],
+    title: "Invoke in Contract Studio",
   });
 });
 
-test("getContractTreeCommand does not open workspace contracts on selection", () => {
-  assert.equal(
-    getContractTreeCommand({ name: "Sample", path: "/workspace/Sample.nef" }),
-    undefined
-  );
+test("getContractTreeCommand opens Contract Studio for workspace contracts", () => {
+  const contract = { name: "Sample", path: "/workspace/Sample.nef" };
+  assert.deepEqual(getContractTreeCommand(contract), {
+    command: "neo3-visual-devtracker.neo.openContractStudio",
+    arguments: [contract],
+    title: "Invoke in Contract Studio",
+  });
 });
 
 test("workspace contract tree items expose their trusted file path", () => {

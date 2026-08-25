@@ -19,13 +19,13 @@ export function getWorkspaceContractPath(context: unknown) {
 }
 
 export default function getContractTreeCommand(contract: ContractTreeData) {
-  if (!contract.hash) {
+  if (!contract.hash && !contract.path) {
     return undefined;
   }
 
   return {
-    command: "neo3-visual-devtracker.tracker.openContract",
-    arguments: [{ hash: contract.hash }],
-    title: contract.hash,
+    command: "neo3-visual-devtracker.neo.openContractStudio",
+    arguments: [contract],
+    title: "Invoke in Contract Studio",
   };
 }

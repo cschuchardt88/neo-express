@@ -92,7 +92,7 @@ namespace NeoExpress.Node
             var signers = new[] { new Signer { Account = accountHash, Scopes = witnessScope } };
             var tm = await TransactionManager.MakeTransactionAsync(rpcClient, script, signers).ConfigureAwait(false);
 
-            tm.Tx.SystemFee += NodeUtility.AdditionalGasSystemFee(additionalGas);
+            tm.Tx.SystemFee += NodeUtility.SystemFeeBuffer(additionalGas);
 
             var account = wallet.GetAccount(accountHash)
                 ?? throw new Exception($"Account {accountHash} not found in wallet {wallet.Name}");

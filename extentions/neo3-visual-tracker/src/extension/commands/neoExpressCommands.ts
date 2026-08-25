@@ -12,20 +12,53 @@ import IoHelpers from "../util/ioHelpers";
 import NeoExpress from "../neoExpress/neoExpress";
 import NeoExpressInstanceManager from "../neoExpress/neoExpressInstanceManager";
 import posixPath from "../util/posixPath";
+import stripAnsi from "../util/stripAnsi";
+import { contractsWithStandard } from "../../shared/expressWalletAddresses";
+import { isFailedTx, isNodeStillRunningError, parseSubmittedTxids } from "../../shared/neoExpressTx";
+import { ensureAccountHasGas, passwordFlags, waitForContract, waitForTransactionResult, withStatus } from "../util/txPrep";
 import StorageExplorerPanelController from "../panelControllers/storageExplorerPanelController";
 import TrackerPanelController from "../panelControllers/trackerPanelController";
 import workspaceFolder from "../util/workspaceFolder";
+
+function sortWalletNames(names: string[]): string[] {
+  return [...names].sort((a, b) => {
+    if (a === "genesis") {
+      return -1;
+    }
+    if (b === "genesis") {
+      return 1;
+    }
+    return a.localeCompare(b);
+  });
+}
+
+async function accountChoices(
+  identifier: BlockchainIdentifier,
+  autoComplete?: AutoComplete
+): Promise<string[]> {
+  const wellKnown = Object.keys(autoComplete?.data.wellKnownAddresses ?? {});
+  if (wellKnown.length) {
+    return sortWalletNames(wellKnown);
+  }
+  return sortWalletNames(Object.keys(await identifier.getWalletAddresses()));
+}
+
+function accountSigner(name: string, autoComplete?: AutoComplete): string {
+  return autoComplete?.data.accountSigners?.[name] || name;
+}
 
 export default class NeoExpressCommands {
   static async contractDeploy(
     neoExpress: NeoExpress,
     contractDetector: ContractDetector,
     blockchainsTreeDataProvider: BlockchainsTreeDataProvider,
-    commandArguments?: CommandArguments
+    commandArguments?: CommandArguments,
+    autoComplete?: AutoComplete,
+    preferred?: BlockchainIdentifier
   ) {
     const identifier =
       commandArguments?.blockchainIdentifier ||
-      (await blockchainsTreeDataProvider.select("express"));
+      (await blockchainsTreeDataProvider.select("express", preferred));
     if (!identifier) {
       return;
     }
@@ -35,18 +68,22 @@ export default class NeoExpressCommands {
       );
       return;
     }
-    const walletNames = Object.keys(await identifier.getWalletAddresses());
-    const account = await IoHelpers.multipleChoice(
-      "Select an account...",
-      ...walletNames
-    );
-    if (!account) {
+    const accountNames = await accountChoices(identifier, autoComplete);
+    let accountName = commandArguments?.sender;
+    if (!accountName || accountNames.indexOf(accountName) === -1) {
+      accountName = await IoHelpers.multipleChoice(
+        "Select an account (genesis holds NEO/GAS)...",
+        ...accountNames
+      );
+    }
+    if (!accountName) {
       return;
     }
+    const account = accountSigner(accountName, autoComplete);
     const contractFile =
       commandArguments?.path ||
       (await IoHelpers.multipleChoiceFiles(
-        `Use account "${account}" to deploy...`,
+        `Use account "${accountName}" to deploy...`,
         ...Object.values(contractDetector.contracts).map(
           (_) => _.absolutePathToNef
         )
@@ -54,15 +91,53 @@ export default class NeoExpressCommands {
     if (!contractFile) {
       return;
     }
-    const output = await neoExpress.run(
-      "contract",
-      "deploy",
-      contractFile,
-      account,
-      "-i",
-      identifier.configPath
-    );
-    NeoExpressCommands.showResult(output);
+    const password = await passwordFlags(account);
+    if (!password) {
+      return;
+    }
+    await withStatus("Deploying contract", async (report) => {
+      report("Checking GAS balance...");
+      if (
+        !(await ensureAccountHasGas(
+          neoExpress,
+          identifier,
+          accountName,
+          account,
+          autoComplete,
+          report
+        ))
+      ) {
+        return;
+      }
+      const contractName =
+        contractDetector.contracts[
+          Object.keys(contractDetector.contracts).find(
+            (name) =>
+              contractDetector.contracts[name].absolutePathToNef ===
+              posixPath(contractFile)
+          ) || ""
+        ]?.manifest?.name ||
+        posixPath(contractFile).split("/").pop()?.replace(/\.nef$/i, "") ||
+        "";
+      report("Submitting deploy transaction...");
+      const output = await NeoExpressCommands.runDeploy(
+        neoExpress,
+        identifier,
+        contractFile,
+        account,
+        password,
+        !!commandArguments?.force,
+        report,
+        contractName
+      );
+      if (!output) {
+        return;
+      }
+      await contractDetector.refresh();
+      vscode.window.showInformationMessage(
+        stripAnsi(output) || `Deployed ${contractName}.`
+      );
+    });
   }
 
   static async create(
@@ -219,15 +294,113 @@ export default class NeoExpressCommands {
     );
   }
 
+  private static async runDeploy(
+    neoExpress: NeoExpress,
+    identifier: BlockchainIdentifier,
+    contractFile: string,
+    account: string,
+    password: string[],
+    force: boolean,
+    report: (msg: string) => void,
+    contractName?: string
+  ): Promise<string | null> {
+    const gasFlags = (await neoExpress.supportsDeployGasOption())
+      ? (["-g", "1"] as const)
+      : [];
+    let output = await neoExpress.run(
+      "contract",
+      "deploy",
+      contractFile,
+      account,
+      ...gasFlags,
+      "-i",
+      identifier.configPath,
+      ...(force ? ["-f"] : []),
+      ...password
+    );
+    if (
+      output.isError &&
+      gasFlags.length &&
+      /unrecognized option\s+'?-g/i.test(stripAnsi(output.message))
+    ) {
+      output = await neoExpress.run(
+        "contract",
+        "deploy",
+        contractFile,
+        account,
+        "-i",
+        identifier.configPath,
+        ...(force ? ["-f"] : []),
+        ...password
+      );
+    }
+    const confirmed = await NeoExpressCommands.confirmSubmittedTx(
+      neoExpress,
+      identifier,
+      output,
+      report
+    );
+    if (!confirmed) {
+      return null;
+    }
+    if (!parseSubmittedTxids(confirmed)[0] && contractName) {
+      const onChain = await waitForContract(
+        neoExpress,
+        identifier,
+        contractName,
+        12000,
+        report
+      );
+      if (!onChain) {
+        vscode.window.showErrorMessage(
+          confirmed +
+            " The transaction was submitted, but the contract is not on chain."
+        );
+        return null;
+      }
+    }
+    return confirmed;
+  }
+
+  private static async confirmSubmittedTx(
+    neoExpress: NeoExpress,
+    identifier: BlockchainIdentifier,
+    output: { message: string; isError?: boolean },
+    report: (msg: string) => void
+  ): Promise<string | null> {
+    if (output.isError || isFailedTx(output.message)) {
+      NeoExpressCommands.showResult(output);
+      return null;
+    }
+    const txid = parseSubmittedTxids(output.message)[0];
+    if (txid) {
+      const confirmed = await waitForTransactionResult(
+        neoExpress,
+        identifier,
+        txid,
+        20000,
+        report
+      );
+      if (!confirmed.ok) {
+        vscode.window.showErrorMessage(
+          `Transaction failed.\n${confirmed.message}`
+        );
+        return null;
+      }
+    }
+    return stripAnsi(output.message);
+  }
+
   static async reset(
     neoExpress: NeoExpress,
     neoExpressInstanceManager: NeoExpressInstanceManager,
     blockchainsTreeDataProvider: BlockchainsTreeDataProvider,
-    commandArguments?: CommandArguments
+    commandArguments?: CommandArguments,
+    preferred?: BlockchainIdentifier
   ) {
     const blockchainIdentifier =
       commandArguments?.blockchainIdentifier ||
-      (await blockchainsTreeDataProvider.select("express"));
+      (await blockchainsTreeDataProvider.select("express", preferred));
     if (!blockchainIdentifier) {
       return;
     }
@@ -238,22 +411,40 @@ export default class NeoExpressCommands {
       return;
     }
     const wasRunning = neoExpressInstanceManager.isRunning(blockchainIdentifier);
-    await neoExpressInstanceManager.stopAll(blockchainIdentifier);
-    try {
-      const output = await neoExpress.run(
+    await withStatus("Resetting Neo Express", async (report) => {
+      report("Stopping node...");
+      await neoExpressInstanceManager.stopAll(blockchainIdentifier);
+      report("Resetting chain data...");
+      let output = await neoExpress.run(
         "reset",
         "-f",
+        "--all",
         "-i",
         blockchainIdentifier.configPath
       );
+      if (isNodeStillRunningError(output.message)) {
+        report("Node still running; stopping again...");
+        await neoExpressInstanceManager.stopAll(blockchainIdentifier);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        output = await neoExpress.run(
+          "reset",
+          "-f",
+          "--all",
+          "-i",
+          blockchainIdentifier.configPath
+        );
+      }
       NeoExpressCommands.showResult(output);
-    } finally {
+      if (output.isError || isFailedTx(output.message) || isNodeStillRunningError(output.message)) {
+        return;
+      }
       if (wasRunning) {
+        report("Restarting node...");
         await neoExpressInstanceManager.run(blockchainsTreeDataProvider, {
           blockchainIdentifier,
         });
       }
-    }
+    });
   }
 
   static async restoreCheckpoint(
@@ -284,43 +475,51 @@ export default class NeoExpressCommands {
     }
     const wasRunning = neoExpressInstanceManager.isRunning(identifier);
     await neoExpressInstanceManager.stopAll(identifier);
-    try {
-      const output = await neoExpress.run(
-        "checkpoint",
-        "restore",
-        "-f",
-        "-i",
-        identifier.configPath,
-        filename
-      );
-      NeoExpressCommands.showResult(output);
-    } finally {
-      if (wasRunning) {
-        await neoExpressInstanceManager.run(blockchainsTreeDataProvider, {
-          blockchainIdentifier: identifier,
-        });
-      }
+    const output = await neoExpress.run(
+      "checkpoint",
+      "restore",
+      "-f",
+      "-i",
+      identifier.configPath,
+      filename
+    );
+    NeoExpressCommands.showResult(output);
+    if (output.isError || isNodeStillRunningError(output.message)) {
+      return;
+    }
+    if (wasRunning) {
+      await neoExpressInstanceManager.run(blockchainsTreeDataProvider, {
+        blockchainIdentifier: identifier,
+      });
     }
   }
 
   static async transfer(
     neoExpress: NeoExpress,
     blockchainsTreeDataProvider: BlockchainsTreeDataProvider,
-    commandArguments?: CommandArguments
+    autoComplete?: AutoComplete,
+    commandArguments?: CommandArguments,
+    preferred?: BlockchainIdentifier
   ) {
     const identifier =
       commandArguments?.blockchainIdentifier ||
-      (await blockchainsTreeDataProvider.select("express"));
+      (await blockchainsTreeDataProvider.select("express", preferred));
     if (!identifier) {
       return;
     }
-    let asset: string | undefined = undefined;
-    if (commandArguments?.asset?.toUpperCase() === "NEO") {
-      asset = "NEO";
-    } else if (commandArguments?.asset?.toUpperCase() === "GAS") {
-      asset = "GAS";
-    } else {
-      asset = await IoHelpers.multipleChoice("Select an asset", "NEO", "GAS");
+    const nep17 = autoComplete
+      ? contractsWithStandard(
+          autoComplete.data.contractManifests,
+          "NEP-17"
+        )
+      : [];
+    const assets = ["NEO", "GAS", ...nep17];
+    let asset: string | undefined = commandArguments?.asset;
+    if (!asset || assets.indexOf(asset) === -1) {
+      asset = await IoHelpers.multipleChoice(
+        "Select an asset (NEO, GAS, or NEP-17)",
+        ...assets
+      );
     }
     if (!asset) {
       return;
@@ -328,13 +527,13 @@ export default class NeoExpressCommands {
     const amount =
       commandArguments?.amount === undefined
         ? await IoHelpers.enterNumber(
-            `How many ${asset} should be transferred?`
+            `How many ${asset} should be transferred? Use a whole number, or check the token decimals.`
           )
         : commandArguments.amount;
     if (amount === undefined) {
       return;
     }
-    const walletNames = Object.keys(await identifier.getWalletAddresses());
+    const walletNames = await accountChoices(identifier, autoComplete);
     let sender = commandArguments?.sender;
     if (!sender || walletNames.indexOf(sender) === -1) {
       sender = await IoHelpers.multipleChoice(
@@ -343,6 +542,22 @@ export default class NeoExpressCommands {
       );
     }
     if (!sender) {
+      return;
+    }
+    const senderArg = accountSigner(sender, autoComplete);
+    const senderPassword = await passwordFlags(senderArg);
+    if (!senderPassword) {
+      return;
+    }
+    if (
+      !(await ensureAccountHasGas(
+        neoExpress,
+        identifier,
+        sender,
+        senderArg,
+        autoComplete
+      ))
+    ) {
       return;
     }
     let receiver = commandArguments?.receiver;
@@ -355,7 +570,7 @@ export default class NeoExpressCommands {
       );
     }
     if (receiver === CUSTOM_ADDRESS) {
-      receiver = await IoHelpers.enterString("Enter the recipients address");
+      receiver = await IoHelpers.enterString("Enter the recipient address");
     }
     if (!receiver) {
       return;
@@ -366,8 +581,96 @@ export default class NeoExpressCommands {
       identifier.configPath,
       `${amount}`,
       asset,
-      sender,
-      receiver
+      senderArg,
+      accountSigner(receiver, autoComplete),
+      ...senderPassword
+    );
+    NeoExpressCommands.showResult(output);
+  }
+
+  static async transferNft(
+    neoExpress: NeoExpress,
+    blockchainsTreeDataProvider: BlockchainsTreeDataProvider,
+    autoComplete?: AutoComplete,
+    commandArguments?: CommandArguments,
+    preferred?: BlockchainIdentifier
+  ) {
+    const identifier =
+      commandArguments?.blockchainIdentifier ||
+      (await blockchainsTreeDataProvider.select("express", preferred));
+    if (!identifier) {
+      return;
+    }
+    const nep11 = autoComplete
+      ? contractsWithStandard(
+          autoComplete.data.contractManifests,
+          "NEP-11"
+        )
+      : [];
+    const contract =
+      commandArguments?.asset ||
+      (await IoHelpers.multipleChoice(
+        "Select a NEP-11 contract",
+        ...(nep11.length ? nep11 : ["(enter a symbol or hash)"])
+      ));
+    const nftContract =
+      !contract || contract.startsWith("(")
+        ? await IoHelpers.enterString("NEP-11 symbol or script hash")
+        : contract;
+    if (!nftContract) {
+      return;
+    }
+    const tokenId = await IoHelpers.enterString(
+      "Token id (0x-prefixed hex or base64)"
+    );
+    if (!tokenId) {
+      return;
+    }
+    const walletNames = await accountChoices(identifier, autoComplete);
+    const sender = await IoHelpers.multipleChoice(
+      "Transfer NFT from which wallet?",
+      ...walletNames
+    );
+    if (!sender) {
+      return;
+    }
+    const senderArg = accountSigner(sender, autoComplete);
+    const senderPassword = await passwordFlags(senderArg);
+    if (!senderPassword) {
+      return;
+    }
+    if (
+      !(await ensureAccountHasGas(
+        neoExpress,
+        identifier,
+        sender,
+        senderArg,
+        autoComplete
+      ))
+    ) {
+      return;
+    }
+    const CUSTOM_ADDRESS = "(enter an address manually)";
+    let receiver = await IoHelpers.multipleChoice(
+      `Transfer NFT from '${sender}' to...`,
+      ...walletNames,
+      CUSTOM_ADDRESS
+    );
+    if (receiver === CUSTOM_ADDRESS) {
+      receiver = await IoHelpers.enterString("Enter the recipient address");
+    }
+    if (!receiver) {
+      return;
+    }
+    const output = await neoExpress.run(
+      "transfernft",
+      "-i",
+      identifier.configPath,
+      nftContract,
+      tokenId,
+      senderArg,
+      accountSigner(receiver, autoComplete),
+      ...senderPassword
     );
     NeoExpressCommands.showResult(output);
   }
@@ -375,11 +678,12 @@ export default class NeoExpressCommands {
   static async walletCreate(
     neoExpress: NeoExpress,
     blockchainsTreeDataProvider: BlockchainsTreeDataProvider,
-    commandArguments?: CommandArguments
+    commandArguments?: CommandArguments,
+    preferred?: BlockchainIdentifier
   ) {
     const identifier =
       commandArguments?.blockchainIdentifier ||
-      (await blockchainsTreeDataProvider.select("express"));
+      (await blockchainsTreeDataProvider.select("express", preferred));
     if (!identifier) {
       return;
     }
@@ -395,15 +699,37 @@ export default class NeoExpressCommands {
       identifier.configPath
     );
     NeoExpressCommands.showResult(output);
+    if (output.isError) {
+      return;
+    }
+    const fund = await IoHelpers.yesNo(
+      `Send 10000 GAS from genesis to "${walletName}" so it can pay fees?`
+    );
+    if (!fund) {
+      return;
+    }
+    const fundOutput = await neoExpress.run(
+      "transfer",
+      "-i",
+      identifier.configPath,
+      "10000",
+      "gas",
+      "genesis",
+      walletName
+    );
+    NeoExpressCommands.showResult(fundOutput);
   }
 
   private static showResult(output: { message: string; isError?: boolean }) {
-    if (output.isError) {
-      vscode.window.showErrorMessage(output.message || "Unknown error");
-    } else {
-      vscode.window.showInformationMessage(
-        output.message || "Command succeeded"
+    const message = stripAnsi(output.message || "");
+    if (output.isError || isFailedTx(message) || isNodeStillRunningError(message)) {
+      vscode.window.showErrorMessage(
+        isNodeStillRunningError(message)
+          ? "Could not reset or start Neo Express because a node is still running. Close the Neo Express terminal and try again."
+          : message || "Unknown error"
       );
+    } else {
+      vscode.window.showInformationMessage(message || "Command succeeded");
     }
   }
 }
