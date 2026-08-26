@@ -10,7 +10,6 @@
 
 using FluentAssertions;
 using NeoExpress;
-using System.Threading;
 using Xunit;
 
 namespace test.workflowvalidation;
@@ -39,7 +38,7 @@ public class ExpressChainManagerMutexTests
         });
         owner.IsBackground = true;
         owner.Start();
-        acquired.Wait();
+        acquired.Wait(TestContext.Current.CancellationToken);
         try
         {
             ExpressChainManager.IsHeldNamedMutex(name).Should().BeTrue();
