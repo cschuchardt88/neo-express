@@ -16,6 +16,18 @@ namespace test.workflowvalidation;
 public class CommandReferenceTests
 {
     [Fact]
+    public void contract_deploy_documents_gas_default_and_same_hash_force_update()
+    {
+        var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
+        var commandReference = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "command-reference.md"));
+
+        commandReference.Should().Contain("-g|--gas <GAS>");
+        commandReference.Should().Contain("Default: 1");
+        commandReference.Should().Contain("`--force` on the **same** hash");
+        commandReference.Should().Contain("ContractManagement.Update");
+    }
+
+    [Fact]
     public void policy_sync_documentation_matches_the_cli_account_option()
     {
         var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
