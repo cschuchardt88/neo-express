@@ -10,6 +10,9 @@
   <ItemGroup>
     <NeoContractReference Include="..\src\contract.csproj" />
   </ItemGroup>
+  <Target Name="RestoreNeoContractReferences" BeforeTargets="PrepareNeoContractGeneration">
+    <MSBuild Projects="@(NeoContractReference)" Targets="Restore" />
+  </Target>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Neo.Assertions" Version="$(NeoTestVersion)" />
