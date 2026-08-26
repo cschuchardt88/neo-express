@@ -102,3 +102,22 @@ export function contractsWithStandard(
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
+
+export function workspaceNep6AccountNames(accountSigners?: {
+  [name: string]: string;
+}): string[] {
+  if (!accountSigners) {
+    return [];
+  }
+  return Object.keys(accountSigners).filter(
+    (name) => accountSigners[name] !== name
+  );
+}
+
+export function resolveAccountForIdentifier(
+  displayName: string,
+  signer: string,
+  identifierWallets: { [name: string]: string }
+): string {
+  return identifierWallets[displayName] || signer;
+}

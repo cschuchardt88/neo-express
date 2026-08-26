@@ -443,7 +443,6 @@ export default class InvokeFilePanelController extends PanelControllerBase<
                 connection.blockchainIdentifier,
                 displayName,
                 account,
-                this.autoComplete,
                 report
               ))
             ) {

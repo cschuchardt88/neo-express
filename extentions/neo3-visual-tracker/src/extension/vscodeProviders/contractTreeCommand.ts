@@ -19,7 +19,7 @@ export function getWorkspaceContractPath(context: unknown) {
 }
 
 export default function getContractTreeCommand(contract: ContractTreeData) {
-  if (!contract.hash && !contract.path) {
+  if (!contract.hash) {
     return undefined;
   }
 

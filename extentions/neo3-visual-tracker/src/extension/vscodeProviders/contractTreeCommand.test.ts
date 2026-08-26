@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import getContractTreeCommand, {
@@ -15,13 +17,25 @@ test("getContractTreeCommand opens Contract Studio for deployed contracts", () =
   });
 });
 
-test("getContractTreeCommand opens Contract Studio for workspace contracts", () => {
+test("getContractTreeCommand has no default command for workspace contracts", () => {
   const contract = { name: "Sample", path: "/workspace/Sample.nef" };
-  assert.deepEqual(getContractTreeCommand(contract), {
-    command: "neo3-visual-devtracker.neo.openContractStudio",
-    arguments: [contract],
-    title: "Invoke in Contract Studio",
-  });
+  assert.equal(getContractTreeCommand(contract), undefined);
+});
+
+test("workspace contracts keep the explicit rocket action in package.json", () => {
+  const packageJson = JSON.parse(
+    readFileSync(join(__dirname, "../../../package.json"), "utf8")
+  );
+  const inline = packageJson.contributes.menus["view/item/context"].filter(
+    (item: { command: string; when?: string; group?: string }) =>
+      item.command === "neo3-visual-devtracker.neo.openContractStudio"
+  );
+  assert.ok(
+    inline.some(
+      (item: { when?: string; group?: string }) =>
+        item.when?.includes("workspaceContract") && item.group === "inline"
+    )
+  );
 });
 
 test("workspace contract tree items expose their trusted file path", () => {

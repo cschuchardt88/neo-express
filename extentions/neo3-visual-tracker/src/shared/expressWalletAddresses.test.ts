@@ -5,6 +5,8 @@ import {
   contractsWithStandard,
   isHiddenExpressConfig,
   parseExpressWalletAddresses,
+  resolveAccountForIdentifier,
+  workspaceNep6AccountNames,
   workspaceWalletDisplayName,
 } from "./expressWalletAddresses";
 
@@ -73,6 +75,33 @@ test("hides nested test neo-express files from the blockchain list", () => {
   assert.equal(
     isHiddenExpressConfig("/workspace/default.neo-express"),
     false
+  );
+});
+
+test("workspaceNep6AccountNames keeps file-backed wallets, not Express names", () => {
+  assert.deepEqual(
+    workspaceNep6AccountNames({
+      genesis: "genesis",
+      owner: "owner",
+      alice: "/workspace/alice.json",
+    }).sort(),
+    ["alice"]
+  );
+});
+
+test("resolveAccountForIdentifier uses the selected Express config, not the active chain", () => {
+  const chainB = { genesis: "NbGenesis", owner: "NbOwner" };
+  assert.equal(
+    resolveAccountForIdentifier("owner", "owner", chainB),
+    "NbOwner"
+  );
+  assert.equal(
+    resolveAccountForIdentifier("alice", "/workspace/alice.json", chainB),
+    "/workspace/alice.json"
+  );
+  assert.notEqual(
+    resolveAccountForIdentifier("owner", "owner", chainB),
+    "NaOwner"
   );
 });
 

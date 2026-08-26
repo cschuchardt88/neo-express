@@ -1,11 +1,11 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
-import AutoComplete from "../autoComplete";
 import BlockchainIdentifier from "../blockchainIdentifier";
 import IoHelpers from "./ioHelpers";
 import NeoExpress from "../neoExpress/neoExpress";
 import stripAnsi from "./stripAnsi";
+import { resolveAccountForIdentifier } from "../../shared/expressWalletAddresses";
 import {
   isContractOnChain,
   isFailedTx,
@@ -57,13 +57,16 @@ export async function ensureAccountHasGas(
   identifier: BlockchainIdentifier,
   displayName: string,
   signer: string,
-  autoComplete?: AutoComplete,
   report?: (msg: string) => void
 ): Promise<boolean> {
   if (displayName === "genesis" || signer === "genesis") {
     return true;
   }
-  const lookup = autoComplete?.data.wellKnownAddresses[displayName] || signer;
+  const lookup = resolveAccountForIdentifier(
+    displayName,
+    signer,
+    await identifier.getWalletAddresses()
+  );
   report?.(`Checking GAS for ${displayName}...`);
   const existing = await readGasBalance(neoExpress, identifier, lookup);
   if (existing === null || existing > 0) {
