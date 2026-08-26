@@ -52,5 +52,11 @@ test("Reset stops leftover nodes, does not restart after failure, and does not h
     "utf8"
   );
   assert.match(neoExpress, /START_TIMEOUT_MS/);
-  assert.match(neoExpress, /onDidExit/);
+  assert.match(neoExpress, /watchForExpressStart\(pty, START_TIMEOUT_MS\)/);
+
+  const watchStart = readFileSync(
+    join(__dirname, "../neoExpress/watchExpressStart.ts"),
+    "utf8"
+  );
+  assert.match(watchStart, /onDidExit/);
 });

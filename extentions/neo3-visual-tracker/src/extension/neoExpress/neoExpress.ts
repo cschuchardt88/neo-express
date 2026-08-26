@@ -133,7 +133,8 @@ export default class NeoExpress {
     }
     const spawned = this.spawnArgs([command, ...options]);
     const pty = new NeoExpressTerminal(spawned.command, spawned.args);
-    const started = watchForExpressStart(pty);
+    const START_TIMEOUT_MS = 30000;
+    const started = watchForExpressStart(pty, START_TIMEOUT_MS);
     const terminal = vscode.window.createTerminal({ name, pty });
     terminal.show();
 
