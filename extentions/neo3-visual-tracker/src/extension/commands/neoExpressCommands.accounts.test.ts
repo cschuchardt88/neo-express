@@ -10,7 +10,8 @@ test("accountChoices reads wallets from the selected Express identifier plus wor
     /export async function accountChoices\(\s*identifier: BlockchainIdentifier,\s*autoComplete\?: AutoComplete\s*\)/
   );
   assert.match(source, /identifier\.getWalletAddresses\(\)/);
-  assert.match(source, /workspaceNep6AccountNames/);
+  assert.match(source, /buildAccountChoices/);
+  assert.match(source, /signerForAccountChoice/);
   assert.doesNotMatch(
     source,
     /autoComplete\?\.data\.wellKnownAddresses/

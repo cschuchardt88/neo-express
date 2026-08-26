@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildAccountChoices,
   contractsWithStandard,
   isHiddenExpressConfig,
   parseExpressWalletAddresses,
   resolveAccountForIdentifier,
+  signerForAccountChoice,
   workspaceNep6AccountNames,
   workspaceWalletDisplayName,
 } from "./expressWalletAddresses";
@@ -86,6 +88,41 @@ test("workspaceNep6AccountNames keeps file-backed wallets, not Express names", (
       alice: "/workspace/alice.json",
     }).sort(),
     ["alice"]
+  );
+});
+
+test("buildAccountChoices disambiguates Express owner from workspace owner.json", () => {
+  const choices = buildAccountChoices(
+    { genesis: "Ng", owner: "NexpressOwner" },
+    {
+      genesis: "genesis",
+      owner: "/workspace/wallets/owner.json",
+      alice: "/workspace/alice.json",
+    }
+  );
+  assert.deepEqual(
+    choices.map((choice) => choice.label),
+    ["genesis", "owner", "alice", "owner (owner.json)"]
+  );
+  assert.equal(signerForAccountChoice("owner", choices), "owner");
+  assert.equal(
+    signerForAccountChoice("owner (owner.json)", choices),
+    "/workspace/wallets/owner.json"
+  );
+  assert.equal(
+    resolveAccountForIdentifier("owner", "owner", {
+      genesis: "Ng",
+      owner: "NexpressOwner",
+    }),
+    "NexpressOwner"
+  );
+  assert.equal(
+    resolveAccountForIdentifier(
+      "owner (owner.json)",
+      "/workspace/wallets/owner.json",
+      { genesis: "Ng", owner: "NexpressOwner" }
+    ),
+    "/workspace/wallets/owner.json"
   );
 });
 
