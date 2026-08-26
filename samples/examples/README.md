@@ -60,7 +60,7 @@ neoxp run -i default.neo-express --seconds-per-block 1
 neoxp contract run -i default.neo-express Nep17Contract symbol --results
 ```
 
-`dotnet clean` / `dotnet rebuild` delete the deploy stamp so the next build deploys again.
+`dotnet clean` or `dotnet build -t:Rebuild` deletes the deploy stamp so the next build deploys again.
 
 ## VS Code
 

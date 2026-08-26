@@ -25,6 +25,12 @@ test("samples/examples uses a neo-express + BuildTasks layout", () => {
   assert.match(props, /DeployContractToNeoExpress/);
   assert.match(props, /contract deploy/);
   assert.match(props, /dotnet tool run neoxp -- create/);
+  assert.match(props, /_NeoDeployForce/);
+  assert.match(props, / --force/);
+  assert.doesNotMatch(
+    props,
+    /IgnoreExitCode="true"\s+Command="dotnet tool run neoxp -- contract deploy/
+  );
   assert.equal(existsSync(join(examplesRoot, "README.md")), true);
 
   for (const example of expected) {

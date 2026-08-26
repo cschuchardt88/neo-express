@@ -42,7 +42,7 @@ namespace $_CONTRACTNAME_$Tests
             using var snapshot = fixture.GetSnapshot();
             using var engine = new TestApplicationEngine(snapshot, settings);
 
-            engine.ExecuteScript<$_CLASSNAME_$>(c => c.MyMethod());
+            engine.ExecuteScript<$_CLASSNAME_$>(c => c.myMethod());
 
             engine.State.Should().Be(VMState.HALT);
             engine.ResultStack.Should().HaveCount(1);

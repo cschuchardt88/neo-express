@@ -3,8 +3,7 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <NeoExpressBatchFile>.\setup-test-chain.batch</NeoExpressBatchFile>
-    <NeoExpressBatchInputFile>.\$_CLASSNAME_$Tests.neo-express</NeoExpressBatchInputFile>
-    <NeoExpressBatchInputFileFromWorkspace>test/$_CLASSNAME_$Tests.neo-express</NeoExpressBatchInputFileFromWorkspace>
+    <NeoExpressBatchInputFile>../default.neo-express</NeoExpressBatchInputFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>$_CONTRACTNAME_$Tests</RootNamespace>
@@ -36,13 +35,13 @@
     <Exec WorkingDirectory="$(ProjectDir).."
           Command="dotnet tool restore" />
     <Exec WorkingDirectory="$(ProjectDir).."
-          Command="dotnet tool run neoxp -- create -o &quot;$(NeoExpressBatchInputFileFromWorkspace)&quot;" />
+          Command="dotnet tool run neoxp -- create -o default.neo-express" />
     <Exec WorkingDirectory="$(ProjectDir).."
-          Command="dotnet tool run neoxp -- wallet create -i &quot;$(NeoExpressBatchInputFileFromWorkspace)&quot; owner" />
+          Command="dotnet tool run neoxp -- wallet create -i default.neo-express owner" />
     <Exec WorkingDirectory="$(ProjectDir).."
-          Command="dotnet tool run neoxp -- wallet create -i &quot;$(NeoExpressBatchInputFileFromWorkspace)&quot; alice" />
+          Command="dotnet tool run neoxp -- wallet create -i default.neo-express alice" />
     <Exec WorkingDirectory="$(ProjectDir).."
-          Command="dotnet tool run neoxp -- wallet create -i &quot;$(NeoExpressBatchInputFileFromWorkspace)&quot; bob" />
+          Command="dotnet tool run neoxp -- wallet create -i default.neo-express bob" />
   </Target>
 
 </Project>

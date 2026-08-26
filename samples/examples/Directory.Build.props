@@ -36,16 +36,11 @@
     <PropertyGroup>
       <_NeoChainOffline Condition="'$(_NeoResetExit)' == '0'">true</_NeoChainOffline>
     </PropertyGroup>
+    <PropertyGroup>
+      <_NeoDeployForce Condition="'$(_NeoChainOffline)' != 'true'"> --force</_NeoDeployForce>
+    </PropertyGroup>
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
-          Condition="'$(_NeoChainOffline)' == 'true'"
-          Command="dotnet tool run neoxp -- contract deploy &quot;bin/sc/$(NeoContractName).nef&quot; genesis --input $(NeoExpressInputFile)" />
-    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
-          Condition="'$(_NeoChainOffline)' != 'true'"
-          IgnoreExitCode="true"
-          Command="dotnet tool run neoxp -- contract deploy &quot;bin/sc/$(NeoContractName).nef&quot; genesis --input $(NeoExpressInputFile)" />
-    <Message Importance="high"
-             Condition="'$(_NeoChainOffline)' != 'true'"
-             Text="Neo Express is running. The contract is deployed if it was new; stop the chain and rebuild to replace it." />
+          Command="dotnet tool run neoxp -- contract deploy &quot;bin/sc/$(NeoContractName).nef&quot; genesis --input $(NeoExpressInputFile)$(_NeoDeployForce)" />
     <Touch Files="$(NeoExpressDeployStamp)" AlwaysCreate="true" />
     <ItemGroup>
       <FileWrites Include="$(NeoExpressDeployStamp)" />
