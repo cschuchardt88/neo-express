@@ -178,7 +178,7 @@ namespace NeoExpress
                 {
                     try
                     {
-                        if (!mutex.WaitOne(TimeSpan.Zero))
+                        if (!mutex.WaitOne(1))
                             return true;
 
                         mutex.ReleaseMutex();

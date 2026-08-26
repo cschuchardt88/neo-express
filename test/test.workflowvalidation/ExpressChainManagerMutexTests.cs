@@ -10,6 +10,7 @@
 
 using FluentAssertions;
 using NeoExpress;
+using System.Diagnostics;
 using Xunit;
 
 namespace test.workflowvalidation;
@@ -59,14 +60,14 @@ public class ExpressChainManagerMutexTests
     }
 
     [Fact]
-    public void IsHeldNamedMutex_is_false_when_the_mutex_was_abandoned()
+    public void IsHeldNamedMutex_is_false_when_the_owning_handle_is_closed()
     {
         var name = UniqueName();
-        Mutex? abandoned = null;
+        Mutex? owned = null;
         using var started = new ManualResetEventSlim(false);
         var owner = new Thread(() =>
         {
-            abandoned = new Mutex(true, name, out var createdNew);
+            owned = new Mutex(true, name, out var createdNew);
             createdNew.Should().BeTrue();
             started.Set();
         });
@@ -75,25 +76,51 @@ public class ExpressChainManagerMutexTests
         started.Wait(TestContext.Current.CancellationToken);
         owner.Join();
 
+        owned!.Dispose();
+        ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsHeldNamedMutex_is_false_when_the_owning_process_exits()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var name = UniqueName();
+        var command = "$m = New-Object System.Threading.Mutex($true, '" + name + "'); Start-Sleep 60";
+        using var proc = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = "-NoProfile -NonInteractive -Command \"" + command + "\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        });
+        proc.Should().NotBeNull();
         try
         {
-            if (OperatingSystem.IsWindows())
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline && !Mutex.TryOpenExisting(name, out var opened))
             {
-                // Keep the named handle alive so TryOpenExisting succeeds and WaitOne
-                // observes AbandonedMutexException from the dead owner thread.
-                ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+                Thread.Sleep(20);
             }
-            else
+            if (Mutex.TryOpenExisting(name, out var check))
             {
-                // pthread/file mutexes are not abandoned on thread exit while the handle lives.
-                abandoned!.Dispose();
-                abandoned = null;
-                ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+                check.Dispose();
             }
+
+            ExpressChainManager.IsHeldNamedMutex(name).Should().BeTrue();
+            proc!.Kill(entireProcessTree: true);
+            proc.WaitForExit(5000).Should().BeTrue();
+            ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
         }
         finally
         {
-            abandoned?.Dispose();
+            if (!proc!.HasExited)
+            {
+                proc.Kill(entireProcessTree: true);
+            }
         }
     }
 }
