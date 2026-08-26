@@ -33,14 +33,17 @@ From the repository root:
 dotnet build src/neoxp/neoxp.csproj
 ```
 
-Then either add `src/neoxp/bin/Debug/net10.0` to `PATH`, or define a helper:
+Then either add `src/neoxp/bin/Debug/net10.0` to `PATH`, or define a helper **before**
+`cd` so it still points at the repository root:
 
 ```shell
-# bash
-neoxp() { dotnet exec "$(pwd)/src/neoxp/bin/Debug/net10.0/neoxp.dll" "$@"; }
+# bash (run from the repository root)
+REPO_ROOT="$(pwd)"
+neoxp() { dotnet exec "$REPO_ROOT/src/neoxp/bin/Debug/net10.0/neoxp.dll" "$@"; }
 
-# PowerShell
-function neoxp { dotnet exec "$PWD/src/neoxp/bin/Debug/net10.0/neoxp.dll" @args }
+# PowerShell (run from the repository root)
+$repoRoot = (Get-Location).Path
+function neoxp { dotnet exec "$repoRoot\src\neoxp\bin\Debug\net10.0\neoxp.dll" @args }
 ```
 
 `nccs` still comes from the sample local tools (`dotnet tool restore` in `samples/`).
@@ -103,10 +106,10 @@ neoxp contract run -i default.neo-express Nep17Contract decimals --results
 
 `--results` is a trial run (no transaction). Drop it and pass `--account genesis` to submit.
 
-Or use a `.neo-invoke.json` file from this repo:
+Or use a `.neo-invoke.json` file next to this example:
 
 ```shell
-neoxp contract invoke ../../invoke-files/contract.neo-invoke.json genesis -i default.neo-express
+neoxp contract invoke ./invoke-files/symbol.neo-invoke.json genesis -i default.neo-express
 ```
 
 File format: [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).

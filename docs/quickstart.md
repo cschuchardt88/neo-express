@@ -51,10 +51,11 @@ Full command list: [command-reference.md](command-reference.md).
 
 ## 3. Compile a C# contract
 
-This repo already has Express-ready starters. From the repository root:
+This repo already has Express-ready starters. From `samples/examples/Nep17` (or pass that
+path from the repository root):
 
 ```shell
-dotnet build
+dotnet build samples/examples/Nep17
 ```
 
 That:
@@ -114,7 +115,7 @@ neoxp contract deploy ./bin/sc/Nep17Contract.nef genesis -i default.neo-express
 Reusable calls belong in a `.neo-invoke.json` file:
 
 ```shell
-neoxp contract invoke ../../invoke-files/contract.neo-invoke.json genesis -i default.neo-express
+neoxp contract invoke ./invoke-files/symbol.neo-invoke.json genesis -i default.neo-express
 ```
 
 See [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
