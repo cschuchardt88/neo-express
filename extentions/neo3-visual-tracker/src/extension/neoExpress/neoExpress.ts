@@ -3,9 +3,11 @@ import * as fs from "fs";
 import * as vscode from "vscode";
 import * as which from "which";
 
+import { formatCli } from "../util/redactCli";
 import Log from "../util/log";
 import NeoExpressTerminal from "./neoExpressTerminal";
 import posixPath from "../util/posixPath";
+import { watchForExpressStart } from "./watchExpressStart";
 
 type Command =
   | "checkpoint"
@@ -131,32 +133,11 @@ export default class NeoExpress {
     }
     const spawned = this.spawnArgs([command, ...options]);
     const pty = new NeoExpressTerminal(spawned.command, spawned.args);
+    const started = watchForExpressStart(pty);
     const terminal = vscode.window.createTerminal({ name, pty });
     terminal.show();
 
-    const START_TIMEOUT_MS = 30000;
-    const started = await new Promise<boolean>((resolve) => {
-      let settled = false;
-      const finish = (value: boolean) => {
-        if (!settled) {
-          settled = true;
-          resolve(value);
-        }
-      };
-      const timeout = setTimeout(() => finish(false), START_TIMEOUT_MS);
-      pty.onDidWrite((data) => {
-        if (data.indexOf("Neo express is running") !== -1) {
-          clearTimeout(timeout);
-          finish(true);
-        }
-      });
-      pty.onDidExit((code) => {
-        clearTimeout(timeout);
-        finish(code === 0);
-      });
-    });
-
-    if (!started) {
+    if (!(await started)) {
       Log.warn(
         LOG_PREFIX,
         `Neo Express did not start in ${name} (timeout or process exited)`
@@ -201,9 +182,7 @@ export default class NeoExpress {
       if (durationExternal > 1000) {
         Log.log(
           LOG_PREFIX,
-          `\`neoxp ${command} ${options.join(
-            " "
-          )}\` took ${durationInternal}ms (${durationExternal}ms including time spent awaiting run-lock)`
+          `\`${formatCli("neoxp", [command, ...options])}\` took ${durationInternal}ms (${durationExternal}ms including time spent awaiting run-lock)`
         );
       }
     }
@@ -237,7 +216,10 @@ export default class NeoExpress {
               );
             }
             resolve({
-              message: `Neo Express CLI timed out after ${TIMEOUT_IN_MS / 1000}s: neoxp ${command} ${options.join(" ")}`,
+              message: `Neo Express CLI timed out after ${TIMEOUT_IN_MS / 1000}s: ${formatCli(
+                "neoxp",
+                [command, ...options]
+              )}`,
               isError: true,
             });
           } else if (!complete) {

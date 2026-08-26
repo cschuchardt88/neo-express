@@ -32,19 +32,14 @@ function sortWalletNames(names: string[]): string[] {
   });
 }
 
-async function accountChoices(
-  identifier: BlockchainIdentifier,
-  autoComplete?: AutoComplete
+export async function accountChoices(
+  identifier: BlockchainIdentifier
 ): Promise<string[]> {
-  const wellKnown = Object.keys(autoComplete?.data.wellKnownAddresses ?? {});
-  if (wellKnown.length) {
-    return sortWalletNames(wellKnown);
-  }
   return sortWalletNames(Object.keys(await identifier.getWalletAddresses()));
 }
 
-function accountSigner(name: string, autoComplete?: AutoComplete): string {
-  return autoComplete?.data.accountSigners?.[name] || name;
+function accountSigner(name: string): string {
+  return name;
 }
 
 export default class NeoExpressCommands {
@@ -68,7 +63,7 @@ export default class NeoExpressCommands {
       );
       return;
     }
-    const accountNames = await accountChoices(identifier, autoComplete);
+    const accountNames = await accountChoices(identifier);
     let accountName = commandArguments?.sender;
     if (!accountName || accountNames.indexOf(accountName) === -1) {
       accountName = await IoHelpers.multipleChoice(
@@ -79,7 +74,7 @@ export default class NeoExpressCommands {
     if (!accountName) {
       return;
     }
-    const account = accountSigner(accountName, autoComplete);
+    const account = accountSigner(accountName);
     const contractFile =
       commandArguments?.path ||
       (await IoHelpers.multipleChoiceFiles(
@@ -533,7 +528,7 @@ export default class NeoExpressCommands {
     if (amount === undefined) {
       return;
     }
-    const walletNames = await accountChoices(identifier, autoComplete);
+    const walletNames = await accountChoices(identifier);
     let sender = commandArguments?.sender;
     if (!sender || walletNames.indexOf(sender) === -1) {
       sender = await IoHelpers.multipleChoice(
@@ -544,7 +539,7 @@ export default class NeoExpressCommands {
     if (!sender) {
       return;
     }
-    const senderArg = accountSigner(sender, autoComplete);
+    const senderArg = accountSigner(sender);
     const senderPassword = await passwordFlags(senderArg);
     if (!senderPassword) {
       return;
@@ -582,7 +577,7 @@ export default class NeoExpressCommands {
       `${amount}`,
       asset,
       senderArg,
-      accountSigner(receiver, autoComplete),
+      accountSigner(receiver),
       ...senderPassword
     );
     NeoExpressCommands.showResult(output);
@@ -626,7 +621,7 @@ export default class NeoExpressCommands {
     if (!tokenId) {
       return;
     }
-    const walletNames = await accountChoices(identifier, autoComplete);
+    const walletNames = await accountChoices(identifier);
     const sender = await IoHelpers.multipleChoice(
       "Transfer NFT from which wallet?",
       ...walletNames
@@ -634,7 +629,7 @@ export default class NeoExpressCommands {
     if (!sender) {
       return;
     }
-    const senderArg = accountSigner(sender, autoComplete);
+    const senderArg = accountSigner(sender);
     const senderPassword = await passwordFlags(senderArg);
     if (!senderPassword) {
       return;
@@ -669,7 +664,7 @@ export default class NeoExpressCommands {
       nftContract,
       tokenId,
       senderArg,
-      accountSigner(receiver, autoComplete),
+      accountSigner(receiver),
       ...senderPassword
     );
     NeoExpressCommands.showResult(output);

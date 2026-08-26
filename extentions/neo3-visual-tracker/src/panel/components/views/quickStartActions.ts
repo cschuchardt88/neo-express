@@ -194,7 +194,8 @@ export function getQuickStartActions(
 
     if (!viewState.hasWallets) {
       actions.push("createWallet");
-    } else if (viewState.hasNeoExpressInstance) {
+    }
+    if (viewState.hasNeoExpressInstance) {
       actions.push("transfer");
       actions.push("transferNft");
     }

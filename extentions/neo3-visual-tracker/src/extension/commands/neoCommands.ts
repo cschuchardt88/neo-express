@@ -14,6 +14,7 @@ import JSONC from "../util/JSONC";
 import posixPath from "../util/posixPath";
 import sameFilePath from "../util/sameFilePath";
 import WalletDetector from "../fileDetectors/walletDetector";
+import { resolveInvokeFilePath } from "../util/invokeFilePath";
 import workspaceFolder from "../util/workspaceFolder";
 
 export default class NeoCommands {
@@ -324,25 +325,17 @@ export default class NeoCommands {
 
     const invokeFilesFolder = posixPath(rootFolder, "invoke-files");
     await fs.promises.mkdir(invokeFilesFolder, { recursive: true });
-    const safeContractName =
-      (contractName || "Contract").replace(/[^-_.a-z0-9]/gi, "-") ||
-      "Contract";
-    let filename = posixPath(
+    const { path: filename, reuse } = resolveInvokeFilePath(
       invokeFilesFolder,
-      `${safeContractName}.neo-invoke.json`
+      contractName || "Contract",
+      (candidate) => fs.existsSync(candidate)
     );
-    let i = 1;
-    while (fs.existsSync(filename)) {
-      filename = posixPath(
-        invokeFilesFolder,
-        `${safeContractName}-${i}.neo-invoke.json`
+    if (!reuse) {
+      await fs.promises.writeFile(
+        filename,
+        JSONC.stringify([{ contract: contractReference, operation: "" }])
       );
-      i++;
     }
-    await fs.promises.writeFile(
-      filename,
-      JSONC.stringify([{ contract: contractReference, operation: "" }])
-    );
     await vscode.commands.executeCommand(
       "vscode.openWith",
       vscode.Uri.file(filename),

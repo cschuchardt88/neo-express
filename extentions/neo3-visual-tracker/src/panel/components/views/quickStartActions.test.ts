@@ -73,6 +73,17 @@ test("offers transfer when Express and wallets are available", () => {
   assert(actions.includes("transferNft"));
 });
 
+test("offers transfer in a fresh Express workspace that has no NEP-6 wallets", () => {
+  const actions = getQuickStartActions({
+    ...baseState,
+    hasNeoExpressInstance: true,
+    hasWallets: false,
+  });
+  assert(actions.includes("transfer"));
+  assert(actions.includes("transferNft"));
+  assert(actions.includes("createWallet"));
+});
+
 test("does not offer checkpoint actions when no single-node Express instance is present", () => {
   const actions = getQuickStartActions({
     ...baseState,
