@@ -18,22 +18,27 @@ The extension runs `neodebug` from `PATH`. Override with
 
 Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and VS Code 1.104+.
 
+From this repository you can also run `dotnet run --project src/neodebug`.
+
 ## Launch configuration
 
 Add a configuration to `.vscode/launch.json`. `program` and `invocation` are required.
 
+This build of `neodebug` **replays recorded traces**. Capture one with
+`neoxp contract invoke --trace` (or `neoxp run --trace`) locally, or with `neotrace` for a
+public-chain transaction ([trace-command-reference.md](trace-command-reference.md)).
+
 | Property | Meaning |
 | -------- | ------- |
 | `program` | Absolute path to the compiled `.nef`. Sibling `.manifest.json` and `.nefdbgnfo` / `.debug.json` are loaded automatically. |
-| `invocation` | Either `{ "trace-file": "<path>" }` to replay a `.neo-trace`, or `{ "operation": "<method>", "args": [ ... ] }` to deploy and run live. |
-| `return-types` | Optional cast hints for return values: `int`, `bool`, `string`, `hex`, `byte[]`, `addr`. |
+| `invocation` | `{ "trace-file": "<path>" }` to replay a `.neo-trace`. Live `{ "operation", "args" }` launch is not supported in this build. |
+| `returnTypes` | Optional cast hints for return values: `int`, `bool`, `string`, `hex`, `byte[]`, `addr`. (`return-types` is accepted as an alias.) |
 | `sourceFileMap` | Optional map from paths stored in debug info to paths on this machine. |
-| `debug-view` | `source` (default) or `disassembly`. |
+
+The default source vs disassembly view is a `neodebug` CLI flag (`-v` / `--debug-view`),
+not a `launch.json` property.
 
 ### Replay a recorded trace (step backward)
-
-Produce a `.neo-trace` with `neoxp contract invoke --trace` (or `neoxp run --trace`) locally,
-or with `neotrace` for a public-chain transaction ([trace-command-reference.md](trace-command-reference.md)).
 
 ```jsonc
 {
@@ -42,19 +47,7 @@ or with `neotrace` for a public-chain transaction ([trace-command-reference.md](
   "request": "launch",
   "program": "${workspaceFolder}/src/bin/sc/Nep17Contract.nef",
   "invocation": { "trace-file": "${workspaceFolder}/traces/transaction.neo-trace" },
-  "return-types": [ "string" ]
-}
-```
-
-### Live invocation
-
-```jsonc
-{
-  "name": "Debug Neo contract (live)",
-  "type": "neo-contract",
-  "request": "launch",
-  "program": "${workspaceFolder}/src/bin/sc/Nep17Contract.nef",
-  "invocation": { "operation": "symbol", "args": [] }
+  "returnTypes": [ "string" ]
 }
 ```
 

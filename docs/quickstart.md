@@ -13,9 +13,13 @@ Works on Windows, macOS, and Ubuntu.
 Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```shell
-dotnet tool install Neo.Express -g
-neoxp --version
+# From this repository (includes the deploy fee pad; NuGet 3.10.1 does not)
+dotnet build src/neoxp/neoxp.csproj
+# then run src/neoxp/bin/Debug/net10.0/neoxp (or `dotnet exec` that DLL)
 ```
+
+A published tool (`dotnet tool install Neo.Express -g`) is fine for commands other than
+deploy until a release includes the fee pad.
 
 ### Release package
 
@@ -27,19 +31,21 @@ Platform libraries (RocksDB) are listed in [installation.md](installation.md).
 
 ## 2. Create and use a private chain
 
+Use **one** chain file. From the repository, stay in `samples/examples/Nep17`:
+
 ```shell
-neoxp create
-neoxp wallet list
-neoxp show balances genesis
-neoxp transfer 1 gas genesis node1
-neoxp run --seconds-per-block 1
+cd samples/examples/Nep17
+neoxp create -o default.neo-express
+neoxp wallet list -i default.neo-express
+neoxp show balances genesis -i default.neo-express
+neoxp transfer 1 gas genesis node1 -i default.neo-express
+neoxp run -i default.neo-express --seconds-per-block 1
 ```
 
 `genesis` is the consensus multi-sig that holds the genesis NEO and GAS. `node1` is the
 default consensus-node wallet.
 
-Leave `neoxp run` going. Other commands use a second terminal in the same folder
-(where `default.neo-express` lives).
+Leave `neoxp run` going. Other commands use a second terminal in the same folder.
 
 Full command list: [command-reference.md](command-reference.md).
 
@@ -48,7 +54,7 @@ Full command list: [command-reference.md](command-reference.md).
 This repo already has Express-ready starters. From the repository root:
 
 ```shell
-dotnet build samples/examples/Nep17
+dotnet build
 ```
 
 That:
@@ -90,25 +96,25 @@ If you used `samples/examples/*`, the first `dotnet build` already deployed. Wit
 in another terminal:
 
 ```shell
-neoxp contract run Nep17Contract symbol --results
+neoxp contract run -i default.neo-express Nep17Contract symbol --results
 ```
 
 `--results` is a dry run. To submit a transaction:
 
 ```shell
-neoxp contract run Nep17Contract symbol --account genesis
+neoxp contract run -i default.neo-express Nep17Contract symbol --account genesis
 ```
 
-Deploy a `.nef` you compiled yourself:
+Deploy a `.nef` you compiled yourself (from this folder):
 
 ```shell
-neoxp contract deploy ./src/bin/sc/MyToken.nef genesis
+neoxp contract deploy ./bin/sc/Nep17Contract.nef genesis -i default.neo-express
 ```
 
 Reusable calls belong in a `.neo-invoke.json` file:
 
 ```shell
-neoxp contract invoke ./invoke-files/contract.neo-invoke.json genesis
+neoxp contract invoke ../../invoke-files/contract.neo-invoke.json genesis -i default.neo-express
 ```
 
 See [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
@@ -119,7 +125,7 @@ See [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
 or **Rebuild**, the stamp is deleted and the next build resets the chain and deploys again:
 
 ```shell
-dotnet rebuild samples/examples/Nep17
+dotnet build -t:Rebuild
 ```
 
 Checkpoint-backed `dotnet test` workflow: [contract-testing.md](contract-testing.md).

@@ -16,61 +16,65 @@ the C# compiler (`nccs`), and `Neo.BuildTasks`.
 On Ubuntu, install RocksDB libraries and **do not** install .NET via Snap (see
 [installation](installation.md#ubuntu)). On macOS, `brew install rocksdb`.
 
-## 1. Install Neo Express
+## Use the command line
+
+Work in **one folder** for the rest of this page: `samples/examples/Nep17`. That is the
+only `default.neo-express` these steps use.
+
+Published `Neo.Express` 3.10.1 can print “Transaction submitted” while persist-time `_deploy`
+FAULTs with Insufficient GAS, so the next `contract run` fails. Build `neoxp` from **this
+repository** (the fee pad lives here until the next NuGet release).
+
+### 1. Build Neo Express from this repository
+
+From the repository root:
 
 ```shell
-dotnet tool install Neo.Express -g
-neoxp --version
+dotnet build src/neoxp/neoxp.csproj
 ```
 
-This repo's samples also pin `neoxp` and `nccs` as local tools. From the `samples/` folder:
+Then either add `src/neoxp/bin/Debug/net10.0` to `PATH`, or define a helper:
 
 ```shell
-cd samples
-dotnet tool restore
-dotnet tool run neoxp -- --version
+# bash
+neoxp() { dotnet exec "$(pwd)/src/neoxp/bin/Debug/net10.0/neoxp.dll" "$@"; }
+
+# PowerShell
+function neoxp { dotnet exec "$PWD/src/neoxp/bin/Debug/net10.0/neoxp.dll" @args }
 ```
 
+`nccs` still comes from the sample local tools (`dotnet tool restore` in `samples/`).
 Full install options (release zip, Trace, WorkNet) are in [installation.md](installation.md).
 
-## 2. Create and run a local chain
+### 2. Create and run a local chain
 
 ```shell
-neoxp create
-neoxp wallet list
-neoxp run --seconds-per-block 1
+cd samples/examples/Nep17
+neoxp create -o default.neo-express
+neoxp wallet list -i default.neo-express
+neoxp run -i default.neo-express --seconds-per-block 1
 ```
 
-`neoxp create` writes `default.neo-express` in the current directory (genesis plus `node1`).
-Leave `neoxp run` in that terminal. In another terminal:
+`neoxp create` writes `default.neo-express` in this folder (genesis plus `node1`).
+Leave `neoxp run` in that terminal. In another terminal in the **same folder**:
 
 ```shell
-neoxp show balances genesis
+neoxp show balances genesis -i default.neo-express
 ```
 
 By default a new block is minted every 15 seconds. `--seconds-per-block 1` makes transfers
 and deploys show up immediately while you are iterating.
 
-## 3. Build and deploy a contract
+### 3. Build and deploy a contract
 
-Pick one of the following.
-
-### Option A — official templates already laid out for Neo Express
-
-From this repository:
+With the chain still running:
 
 ```shell
-cd samples/examples/Nep17
 dotnet build
 ```
 
-Or from the repository root: `dotnet build samples/examples/Nep17`.
-
-The first build creates `default.neo-express` if it is missing, compiles
-`bin/sc/Nep17Contract.nef`, and deploys with `genesis`. This works while a local
-Neo Express instance is running (for example after **Start Neo Express** in VS Code).
-
-That chain file is separate from the `default.neo-express` in [step 2](#2-create-and-run-a-local-chain).
+The first build compiles `bin/sc/Nep17Contract.nef` and deploys with `genesis` against
+this folder’s `default.neo-express`.
 
 Other starters in [`samples/examples/`](../samples/examples/README.md):
 
@@ -82,13 +86,51 @@ Other starters in [`samples/examples/`](../samples/examples/README.md):
 | `Oracle` | Oracle request / response |
 | `Ownable` | Owner + `Destroy` |
 
-`dotnet clean` or `dotnet rebuild` on a contract that sets `NeoExpressBatchFile` deletes the
-batch stamp so the next build resets the chain and redeploys.
+`dotnet clean` or `dotnet build -t:Rebuild` deletes the deploy stamp so the next build
+deploys again.
 
 The original simple sample (a `TokenContract` plus checkpoint tests) is
 [`samples/src`](../samples/src) — see [contract testing](contract-testing.md).
 
-### Option B — New contract wizard in Visual Studio Code
+### 4. Invoke the contract
+
+Still in `samples/examples/Nep17`, with `neoxp run` in the other terminal:
+
+```shell
+neoxp contract run -i default.neo-express Nep17Contract symbol --results
+neoxp contract run -i default.neo-express Nep17Contract decimals --results
+```
+
+`--results` is a trial run (no transaction). Drop it and pass `--account genesis` to submit.
+
+Or use a `.neo-invoke.json` file from this repo:
+
+```shell
+neoxp contract invoke ../../invoke-files/contract.neo-invoke.json genesis -i default.neo-express
+```
+
+File format: [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
+
+In VS Code, select the rocket on a workspace contract to open Contract Studio, pick a
+method, choose the signing account, and run.
+
+### 5. Reset and rebuild
+
+From `samples/examples/Nep17`:
+
+```shell
+# wipe chain state (keeps wallets)
+neoxp reset -f -i default.neo-express
+
+# rebuild contract + redeploy (stamp is deleted)
+dotnet build -t:Rebuild
+```
+
+`Neo.BuildTasks` records a stamp under `obj/` after a **successful** deploy. **Clean** and
+**Rebuild** delete that stamp so deploy runs again. Incremental `dotnet build` skips deploy
+when the `.nef` has not changed.
+
+## New contract wizard in Visual Studio Code
 
 1. Open a folder in VS Code.
 2. Open the Neo N3 Visual DevTracker view (Neo logo in the activity bar).
@@ -101,7 +143,7 @@ The original simple sample (a `TokenContract` plus checkpoint tests) is
 How to load the extension from this repo is in
 [Use Visual Studio Code](#use-visual-studio-code).
 
-### Option C — `dotnet new` from Neo.SmartContract.Template
+## `dotnet new` from Neo.SmartContract.Template
 
 ```shell
 dotnet new install Neo.SmartContract.Template
@@ -110,43 +152,7 @@ dotnet new neocontractnep17 -n MyToken -o ./MyToken
 
 That template compiles with `nccs`. To get the Neo Express layout used in this repo
 (auto-compile via `Neo.BuildTasks` and deploy on build), copy a `samples/examples/*`
-project and replace the `.cs` files, or use the VS Code wizard (option B).
-
-## 4. Invoke the contract
-
-With the example chain running (`neoxp run -i samples/examples/Nep17/default.neo-express --seconds-per-block 1`):
-
-```shell
-neoxp contract run -i samples/examples/Nep17/default.neo-express Nep17Contract symbol --results
-neoxp contract run -i samples/examples/Nep17/default.neo-express Nep17Contract decimals --results
-```
-
-`--results` is a trial run (no transaction). Drop it and pass `--account genesis` to submit.
-
-Or use a `.neo-invoke.json` file:
-
-```shell
-neoxp contract invoke transfer.neo-invoke.json genesis
-```
-
-File format: [Neo Express Invocation File](Neo%20Express%20Invocation%20File.md).
-
-In VS Code, select the rocket on a workspace contract to open Contract Studio, pick a
-method, choose the signing account, and run.
-
-## 5. Reset and rebuild
-
-```shell
-# wipe chain state (keeps wallets)
-neoxp reset -f
-
-# rebuild contract + reset + redeploy (when NeoExpressBatchFile is set)
-dotnet rebuild samples/examples/Nep17
-```
-
-`Neo.BuildTasks` records a stamp under `obj/` after a successful batch. **Clean** and
-**Rebuild** delete that stamp so the batch runs again (chain reset + deploy). Incremental
-`dotnet build` skips the batch when the `.nef` and batch file have not changed.
+project and replace the `.cs` files, or use the VS Code wizard.
 
 ## Use Visual Studio Code
 
@@ -164,8 +170,8 @@ Then press **F5** in that folder (Extension Development Host), or:
 code --extensionDevelopmentPath="<repo>/extentions/neo3-visual-tracker" "<your-workspace>"
 ```
 
-The packaged extension bundles `neoxp`. A source checkout without `deps/nxp` uses `neoxp`
-from PATH (the global tool from step 1, or `dotnet tool restore` in `samples/`).
+The packaged extension bundles `neoxp`. A source checkout without `deps/nxp` uses the
+repo build of `src/neoxp` when present, otherwise `neoxp` from PATH.
 
 Open **Quick Start** and work through: create/start Express → New contract → deploy → invoke.
 
@@ -179,6 +185,8 @@ dotnet tool install Neo.Debug -g
 ```
 
 Launch configurations are documented in [debugger-command-reference.md](debugger-command-reference.md).
+This build of `neodebug` replays recorded traces (`invocation.trace-file`). Live in-process
+launch is not supported yet.
 
 ## What to read next
 
