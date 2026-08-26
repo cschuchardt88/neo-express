@@ -25,10 +25,18 @@ public class AdditionalGasTests
     }
 
     [Fact]
-    public void SystemFeeBuffer_pads_invokescript_estimates_and_adds_requested_gas()
+    public void SystemFeeDelta_does_not_pad_ordinary_transactions()
     {
-        NodeUtility.SystemFeeBuffer(0m).Should().Be(NodeUtility.InvokeEstimatePadDatoshi);
-        NodeUtility.SystemFeeBuffer(1m).Should().Be(100_000_000L + NodeUtility.InvokeEstimatePadDatoshi);
+        NodeUtility.SystemFeeDelta(0m).Should().Be(0L);
+        NodeUtility.SystemFeeDelta(1m).Should().Be(100_000_000L);
+        NodeUtility.SystemFeeDelta(1m, padInvokeEstimate: false).Should().Be(100_000_000L);
+    }
+
+    [Fact]
+    public void SystemFeeDelta_pads_only_when_requested_for_deploy_or_update()
+    {
+        NodeUtility.SystemFeeDelta(0m, padInvokeEstimate: true).Should().Be(NodeUtility.InvokeEstimatePadDatoshi);
+        NodeUtility.SystemFeeDelta(1m, padInvokeEstimate: true).Should().Be(100_000_000L + NodeUtility.InvokeEstimatePadDatoshi);
     }
 
     [Theory]

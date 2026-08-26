@@ -160,17 +160,42 @@ namespace NeoExpress
         {
             // Check to see if there's a neo-express blockchain currently running by
             // attempting to open a mutex with the consensus account script hash for a name.
-            // An abandoned mutex means the previous process died without releasing it.
+            // TryOpenExisting only returns a handle; WaitOne is required to detect
+            // abandonment when the previous process died without releasing it.
 
             var account = node.Wallet.Accounts.Single(a => a.IsDefault);
+            return IsHeldNamedMutex(GLOBAL_PREFIX + account.ScriptHash);
+        }
+
+        internal static bool IsHeldNamedMutex(string mutexName)
+        {
             try
             {
-                if (Mutex.TryOpenExisting(GLOBAL_PREFIX + account.ScriptHash, out var mutex))
+                if (!Mutex.TryOpenExisting(mutexName, out var mutex))
+                    return false;
+
+                using (mutex)
                 {
-                    mutex.Dispose();
-                    return true;
+                    try
+                    {
+                        if (!mutex.WaitOne(TimeSpan.Zero))
+                            return true;
+
+                        mutex.ReleaseMutex();
+                        return false;
+                    }
+                    catch (AbandonedMutexException)
+                    {
+                        try
+                        {
+                            mutex.ReleaseMutex();
+                        }
+                        catch (ApplicationException)
+                        {
+                        }
+                        return false;
+                    }
                 }
-                return false;
             }
             catch (AbandonedMutexException)
             {

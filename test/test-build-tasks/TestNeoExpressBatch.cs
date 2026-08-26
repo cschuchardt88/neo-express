@@ -17,23 +17,60 @@ namespace build_tasks
     public class TestNeoExpressBatch
     {
         [Fact]
-        public void parse_deploy_commands_skips_comments_and_other_lines()
+        public void parse_executable_lines_skips_comments()
         {
             var batch = """
                 # setup
                 transfer 1 gas genesis node1
                 contract deploy ./bin/sc/Contract.nef genesis
-                contract deploy ./bin/sc/Nep17Contract.nef owner
+                contract deploy "./path with space/Nep17Contract.nef" owner --gas 2
                 checkpoint create ./checkpoints/deployed -f
                 // done
                 """;
 
-            var deploys = NeoExpressBatch.ParseDeployCommands(batch);
-            Assert.Equal(2, deploys.Count);
-            Assert.Equal("./bin/sc/Contract.nef", deploys[0].NefFile);
-            Assert.Equal("genesis", deploys[0].Account);
-            Assert.Equal("./bin/sc/Nep17Contract.nef", deploys[1].NefFile);
-            Assert.Equal("owner", deploys[1].Account);
+            var lines = NeoExpressBatch.ParseExecutableLines(batch);
+            Assert.Equal(4, lines.Count);
+            Assert.Equal("transfer 1 gas genesis node1", lines[0]);
+            Assert.Equal("contract deploy ./bin/sc/Contract.nef genesis", lines[1]);
+        }
+
+        [Fact]
+        public void split_command_line_preserves_quoted_paths_and_deploy_options()
+        {
+            var parts = NeoExpressBatch.SplitCommandLine(
+                "contract deploy \"./path with space/Contract.nef\" genesis --gas 2 --data \"{}\"");
+
+            Assert.Equal(new[]
+            {
+                "contract", "deploy", "./path with space/Contract.nef", "genesis",
+                "--gas", "2", "--data", "{}"
+            }, parts);
+            Assert.True(NeoExpressBatch.IsContractDeployLine(parts));
+        }
+
+        [Fact]
+        public void build_deploy_command_does_not_inject_force()
+        {
+            var parts = NeoExpressBatch.SplitCommandLine(
+                "contract deploy \"./path with space/Contract.nef\" genesis --gas 2");
+
+            var command = NeoExpressBatch.BuildDeployCommand(parts, "default.neo-express", trace: false);
+
+            Assert.Equal(
+                "contract deploy \"./path with space/Contract.nef\" genesis --gas 2 --input default.neo-express",
+                command);
+            Assert.DoesNotContain("--force", command);
+        }
+
+        [Fact]
+        public void build_deploy_command_keeps_force_when_the_batch_line_has_it()
+        {
+            var parts = NeoExpressBatch.SplitCommandLine(
+                "contract deploy ./bin/sc/Contract.nef genesis --force");
+
+            var command = NeoExpressBatch.BuildDeployCommand(parts, null, trace: true);
+
+            Assert.Equal("contract deploy ./bin/sc/Contract.nef genesis --force --trace", command);
         }
 
         [Fact]

@@ -72,7 +72,7 @@ namespace Neo.BuildTasks
             if (IsChainRunningFailure(LastProcessResults))
             {
                 Log.LogMessage(MessageImportance.High,
-                    "Neo Express is running; deploying contracts from {0} without resetting the chain.",
+                    "Neo Express is running; applying deploy lines from {0} without resetting the chain.",
                     BatchFile.ItemSpec);
                 return DeployContractsWhileRunning(command, resolvedType, directory);
             }
@@ -125,9 +125,9 @@ namespace Neo.BuildTasks
                 .Any(line => line.IndexOf(RunningChainMessage, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        internal static IReadOnlyList<(string NefFile, string Account)> ParseDeployCommands(string batchText)
+        internal static IReadOnlyList<string> ParseExecutableLines(string batchText)
         {
-            var deploys = new List<(string, string)>();
+            var lines = new List<string>();
             using var reader = new StringReader(batchText);
             string? line;
             while ((line = reader.ReadLine()) is not null)
@@ -135,15 +135,97 @@ namespace Neo.BuildTasks
                 var trimmed = line.Trim();
                 if (trimmed.Length == 0 || trimmed.StartsWith("#") || trimmed.StartsWith("//"))
                     continue;
-                var parts = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 4
-                    && parts[0].Equals("contract", StringComparison.OrdinalIgnoreCase)
-                    && parts[1].Equals("deploy", StringComparison.OrdinalIgnoreCase))
+                lines.Add(trimmed);
+            }
+            return lines;
+        }
+
+        internal static IReadOnlyList<string> SplitCommandLine(string commandLine)
+        {
+            var tokens = new List<string>();
+            var current = new StringBuilder();
+            var inQuotes = false;
+            for (var i = 0; i < commandLine.Length; i++)
+            {
+                var c = commandLine[i];
+                if (c == '"')
                 {
-                    deploys.Add((parts[2], parts[3]));
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+                if (!inQuotes && char.IsWhiteSpace(c))
+                {
+                    if (current.Length > 0)
+                    {
+                        tokens.Add(current.ToString());
+                        current.Clear();
+                    }
+                    continue;
+                }
+                current.Append(c);
+            }
+            if (inQuotes)
+                throw new FormatException("Unbalanced quote in batch command line.");
+            if (current.Length > 0)
+                tokens.Add(current.ToString());
+            return tokens;
+        }
+
+        internal static bool IsContractDeployLine(IReadOnlyList<string> parts)
+        {
+            return parts.Count >= 4
+                && parts[0].Equals("contract", StringComparison.OrdinalIgnoreCase)
+                && parts[1].Equals("deploy", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static string QuoteArgument(string argument)
+        {
+            if (argument.Length == 0)
+                return "\"\"";
+            var needsQuotes = false;
+            for (var i = 0; i < argument.Length; i++)
+            {
+                if (char.IsWhiteSpace(argument[i]) || argument[i] == '"')
+                {
+                    needsQuotes = true;
+                    break;
                 }
             }
-            return deploys;
+            if (!needsQuotes)
+                return argument;
+            return "\"" + argument.Replace("\"", "\\\"") + "\"";
+        }
+
+        internal static bool ContainsOption(IReadOnlyList<string> parts, params string[] names)
+        {
+            for (var i = 0; i < parts.Count; i++)
+            {
+                for (var n = 0; n < names.Length; n++)
+                {
+                    if (parts[i].Equals(names[n], StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        internal static string BuildDeployCommand(IReadOnlyList<string> parts, string? inputFile, bool trace)
+        {
+            var builder = new StringBuilder();
+            for (var i = 0; i < parts.Count; i++)
+            {
+                if (i > 0)
+                    builder.Append(' ');
+                builder.Append(QuoteArgument(parts[i]));
+            }
+            if (!string.IsNullOrEmpty(inputFile) && !ContainsOption(parts, "--input", "-i"))
+            {
+                builder.Append(" --input ");
+                builder.Append(QuoteArgument(inputFile!));
+            }
+            if (trace && !ContainsOption(parts, "--trace"))
+                builder.Append(" --trace");
+            return builder.ToString();
         }
 
         bool DeployContractsWhileRunning(string command, DotNetToolType resolvedType, ITaskItem? directory)
@@ -159,14 +241,51 @@ namespace Neo.BuildTasks
                 return false;
             }
 
-            var deploys = ParseDeployCommands(File.ReadAllText(batchPath));
-            if (deploys.Count == 0)
+            IReadOnlyList<string> lines;
+            try
+            {
+                lines = ParseExecutableLines(File.ReadAllText(batchPath));
+            }
+            catch (Exception ex)
+            {
+                Log.LogError("Failed to read batch file \"{0}\": {1}", batchPath, ex.Message);
+                return false;
+            }
+
+            var deployLines = new List<IReadOnlyList<string>>();
+            foreach (var line in lines)
+            {
+                IReadOnlyList<string> parts;
+                try
+                {
+                    parts = SplitCommandLine(line);
+                }
+                catch (FormatException ex)
+                {
+                    Log.LogError("{0}: {1}", batchPath, ex.Message);
+                    return false;
+                }
+
+                if (IsContractDeployLine(parts))
+                {
+                    deployLines.Add(parts);
+                    continue;
+                }
+
+                Log.LogError(
+                    "Neo Express is running; batch file {0} also contains \"{1}\", which cannot be applied while the chain is up. Stop the node and rerun the batch, or keep only 'contract deploy' lines.",
+                    batchPath,
+                    line);
+                return false;
+            }
+
+            if (deployLines.Count == 0)
             {
                 Log.LogError("Neo Express is running, and {0} has no 'contract deploy' lines to apply.", batchPath);
                 return false;
             }
 
-            foreach (var (nefFile, account) in deploys)
+            foreach (var parts in deployLines)
             {
                 var builder = new StringBuilder();
                 if (resolvedType != DotNetToolType.Global)
@@ -174,15 +293,7 @@ namespace Neo.BuildTasks
                     builder.Append(Command);
                     builder.Append(' ');
                 }
-                builder.AppendFormat("contract deploy \"{0}\" {1} --force", nefFile, account);
-                if (InputFile is not null)
-                {
-                    builder.AppendFormat(" --input \"{0}\"", InputFile.ItemSpec);
-                }
-                if (Trace)
-                {
-                    builder.Append(" --trace");
-                }
+                builder.Append(BuildDeployCommand(parts, InputFile?.ItemSpec, Trace));
 
                 var arguments = builder.ToString();
                 Log.LogMessage(MessageImportance.High, "Running {0} {1}", command, arguments);

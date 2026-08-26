@@ -198,6 +198,107 @@ public class ExpressNodeExtensionsTests
         NodeUtility.ContractNotFoundMessage(scriptHash).Should().Be($"Contract {scriptHash} not found");
     }
 
+    [Theory]
+    [InlineData(1_000u, 30)]
+    [InlineData(15_000u, 50)]
+    [InlineData(60_000u, 185)]
+    public void GetConfirmationTimeout_waits_at_least_three_block_intervals(uint millisecondsPerBlock, int expectedSeconds)
+    {
+        ExpressNodeExtensions.GetConfirmationTimeout(millisecondsPerBlock)
+            .Should().Be(TimeSpan.FromSeconds(expectedSeconds));
+    }
+
+    [Fact]
+    public async Task EnsureTransactionSucceeded_reports_FAULT()
+    {
+        var node = new StubExpressNode(ProtocolSettings.Default)
+        {
+            TransactionLog = new RpcApplicationLog
+            {
+                Executions = new List<Execution>
+                {
+                    new() { VMState = VMState.FAULT, ExceptionMessage = "Insufficient GAS" }
+                }
+            }
+        };
+
+        var act = async () => await node.EnsureTransactionSucceededAsync(UInt256.Zero, TimeSpan.FromSeconds(2));
+
+        await act.Should().ThrowAsync<Exception>().WithMessage("*FAULT*");
+    }
+
+    [Fact]
+    public async Task EnsureTransactionSucceeded_waits_for_a_delayed_HALT()
+    {
+        var node = new StubExpressNode(ProtocolSettings.Default)
+        {
+            LogsUntilHalt = 2,
+            TransactionLog = new RpcApplicationLog
+            {
+                Executions = new List<Execution>
+                {
+                    new() { VMState = VMState.HALT }
+                }
+            }
+        };
+
+        await node.EnsureTransactionSucceededAsync(UInt256.Zero, TimeSpan.FromSeconds(5));
+
+        node.GetTransactionCalls.Should().BeGreaterThan(2);
+    }
+
+    [Fact]
+    public async Task DeployAsync_pads_the_invokescript_estimate_and_passes_additional_gas()
+    {
+        var node = new StubExpressNode(ProtocolSettings.Default);
+        var (nef, manifest) = CreateMinimalContract();
+
+        await ExpressNodeExtensions.DeployAsync(node, nef, manifest, null!, UInt160.Zero, WitnessScope.CalledByEntry, null, 1.5m);
+
+        node.CapturedAdditionalGas.Should().Be(1.5m);
+        node.CapturedPadInvokeEstimate.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_pads_and_forwards_additional_gas()
+    {
+        var node = new StubExpressNode(ProtocolSettings.Default);
+        var (nef, manifest) = CreateMinimalContract();
+
+        await ExpressNodeExtensions.UpdateAsync(node, UInt160.Zero, nef, manifest, null!, UInt160.Zero, WitnessScope.CalledByEntry, null, 2m);
+
+        node.CapturedAdditionalGas.Should().Be(2m);
+        node.CapturedPadInvokeEstimate.Should().BeTrue();
+    }
+
+    static (NefFile nef, ContractManifest manifest) CreateMinimalContract()
+    {
+        var nef = new NefFile
+        {
+            Compiler = "test",
+            Source = string.Empty,
+            Tokens = SysArray.Empty<MethodToken>(),
+            Script = new byte[] { (byte)OpCode.RET },
+        };
+        nef.CheckSum = NefFile.ComputeChecksum(nef);
+        var manifest = ContractManifest.Parse("""
+        {
+          "name":"SampleContract",
+          "groups":[],
+          "features":{},
+          "supportedstandards":[],
+          "abi":{
+            "methods":[{"name":"update","parameters":[{"name":"nef","type":"ByteArray"},{"name":"manifest","type":"String"}],"returntype":"Void","offset":0,"safe":false}],
+            "events":[]
+          },
+          "permissions":[],
+          "trusts":[],
+          "extra":{}
+        }
+        """);
+        return (nef, manifest);
+    }
+
     static bool ContainsSequence(ReadOnlySpan<byte> haystack, ReadOnlySpan<byte> needle)
     {
         for (int i = 0; i <= haystack.Length - needle.Length; i++)
@@ -239,9 +340,19 @@ public class ExpressNodeExtensionsTests
 
         public Task FastForwardAsync(uint blockCount, TimeSpan timestampDelta) => throw new NotSupportedException();
 
-        public Task<UInt256> ExecuteAsync(Wallet wallet, UInt160 accountHash, WitnessScope witnessScope, Script script, decimal additionalGas = 0)
+        public decimal CapturedAdditionalGas { get; private set; }
+
+        public bool CapturedPadInvokeEstimate { get; private set; }
+
+        public int GetTransactionCalls { get; private set; }
+
+        public int LogsUntilHalt { get; set; }
+
+        public Task<UInt256> ExecuteAsync(Wallet wallet, UInt160 accountHash, WitnessScope witnessScope, Script script, decimal additionalGas = 0, bool padInvokeEstimate = false)
         {
             CapturedScript = script;
+            CapturedAdditionalGas = additionalGas;
+            CapturedPadInvokeEstimate = padInvokeEstimate;
             return Task.FromResult(UInt256.Zero);
         }
 
@@ -270,7 +381,15 @@ public class ExpressNodeExtensionsTests
         public RpcApplicationLog? TransactionLog { get; set; }
 
         public Task<(Transaction tx, RpcApplicationLog? appLog)> GetTransactionAsync(UInt256 txHash)
-            => Task.FromResult<(Transaction tx, RpcApplicationLog? appLog)>((null!, TransactionLog));
+        {
+            GetTransactionCalls++;
+            var log = TransactionLog;
+            if (LogsUntilHalt > 0 && GetTransactionCalls <= LogsUntilHalt)
+            {
+                log = null;
+            }
+            return Task.FromResult<(Transaction tx, RpcApplicationLog? appLog)>((null!, log));
+        }
 
         public Task<uint> GetTransactionHeightAsync(UInt256 txHash) => throw new NotSupportedException();
 

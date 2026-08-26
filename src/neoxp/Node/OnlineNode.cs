@@ -87,12 +87,12 @@ namespace NeoExpress.Node
                 block => rpcClient.SubmitBlockAsync(block.ToArray()));
         }
 
-        public async Task<UInt256> ExecuteAsync(Wallet wallet, UInt160 accountHash, WitnessScope witnessScope, Script script, decimal additionalGas = 0)
+        public async Task<UInt256> ExecuteAsync(Wallet wallet, UInt160 accountHash, WitnessScope witnessScope, Script script, decimal additionalGas = 0, bool padInvokeEstimate = false)
         {
             var signers = new[] { new Signer { Account = accountHash, Scopes = witnessScope } };
             var tm = await TransactionManager.MakeTransactionAsync(rpcClient, script, signers).ConfigureAwait(false);
 
-            tm.Tx.SystemFee += NodeUtility.SystemFeeBuffer(additionalGas);
+            tm.Tx.SystemFee += NodeUtility.SystemFeeDelta(additionalGas, padInvokeEstimate);
 
             var account = wallet.GetAccount(accountHash)
                 ?? throw new Exception($"Account {accountHash} not found in wallet {wallet.Name}");

@@ -288,7 +288,8 @@ namespace NeoExpress
                                                       Wallet wallet,
                                                       UInt160 accountHash,
                                                       WitnessScope witnessScope,
-                                                      object? data = null)
+                                                      object? data = null,
+                                                      decimal additionalGas = 1m)
         {
             CheckNefFile(nefFile);
             // Native ContractManagement.Update only succeeds when the calling
@@ -307,7 +308,7 @@ namespace NeoExpress
                     manifest.ToJson().ToString(),
                     data);
 
-            return await expressNode.ExecuteAsync(wallet, accountHash, witnessScope, sb.ToArray()).ConfigureAwait(false);
+            return await expressNode.ExecuteAsync(wallet, accountHash, witnessScope, sb.ToArray(), additionalGas, padInvokeEstimate: true).ConfigureAwait(false);
         }
 
         public static async Task<UInt256> DeployAsync(this IExpressNode expressNode,
@@ -329,12 +330,19 @@ namespace NeoExpress
                 manifest.ToJson().ToString(),
                 data);
             // RPC fee estimation is slightly below actual _deploy consumption (observed 480 datoshi).
-            return await expressNode.ExecuteAsync(wallet, accountHash, witnessScope, sb.ToArray(), additionalGas).ConfigureAwait(false);
+            return await expressNode.ExecuteAsync(wallet, accountHash, witnessScope, sb.ToArray(), additionalGas, padInvokeEstimate: true).ConfigureAwait(false);
+        }
+
+        internal static TimeSpan GetConfirmationTimeout(uint millisecondsPerBlock)
+        {
+            var minimum = TimeSpan.FromSeconds(30);
+            var fromBlocks = TimeSpan.FromMilliseconds((long)millisecondsPerBlock * 3 + 5_000);
+            return fromBlocks > minimum ? fromBlocks : minimum;
         }
 
         public static async Task EnsureTransactionSucceededAsync(this IExpressNode expressNode, UInt256 txHash, TimeSpan? timeout = null)
         {
-            timeout ??= TimeSpan.FromSeconds(30);
+            timeout ??= GetConfirmationTimeout(expressNode.ProtocolSettings.MillisecondsPerBlock);
             var stopwatch = Stopwatch.StartNew();
             Exception? lastError = null;
             while (stopwatch.Elapsed < timeout)

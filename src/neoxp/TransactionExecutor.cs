@@ -60,7 +60,7 @@ namespace NeoExpress
 
         public IExpressNode ExpressNode => expressNode;
 
-        public async Task ContractUpdateAsync(string contract, string nefFilePath, string accountName, string password, WitnessScope witnessScope, object? data = null)
+        public async Task ContractUpdateAsync(string contract, string nefFilePath, string accountName, string password, WitnessScope witnessScope, object? data = null, decimal additionalGas = 1m)
         {
             if (!chainManager.TryGetSigningAccount(accountName, password, out var wallet, out var accountHash))
             {
@@ -89,7 +89,7 @@ namespace NeoExpress
 
             var (nefFile, manifest) = await fileSystem.LoadContractAsync(nefFilePath).ConfigureAwait(false);
             var txHash = await expressNode
-                .UpdateAsync(scriptHash, nefFile, manifest, wallet, accountHash, witnessScope, data)
+                .UpdateAsync(scriptHash, nefFile, manifest, wallet, accountHash, witnessScope, data, additionalGas)
                 .ConfigureAwait(false);
             await expressNode.EnsureTransactionSucceededAsync(txHash).ConfigureAwait(false);
             await writer.WriteTxHashAsync(txHash, "Update", json).ConfigureAwait(false);
@@ -121,7 +121,7 @@ namespace NeoExpress
 
                 var updateTxHash = await expressNode
                     .UpdateAsync(contractHash, nefFile, manifest, wallet, accountHash, witnessScope,
-                        string.IsNullOrEmpty(data) ? null : data)
+                        string.IsNullOrEmpty(data) ? null : data, additionalGas)
                     .ConfigureAwait(false);
                 await expressNode.EnsureTransactionSucceededAsync(updateTxHash).ConfigureAwait(false);
                 await WriteDeployResultAsync(manifest.Name, contractHash, updateTxHash, "Update").ConfigureAwait(false);
