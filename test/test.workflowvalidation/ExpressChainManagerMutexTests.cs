@@ -62,14 +62,38 @@ public class ExpressChainManagerMutexTests
     public void IsHeldNamedMutex_is_false_when_the_mutex_was_abandoned()
     {
         var name = UniqueName();
+        Mutex? abandoned = null;
+        using var started = new ManualResetEventSlim(false);
         var owner = new Thread(() =>
         {
-            _ = new Mutex(true, name);
+            abandoned = new Mutex(true, name, out var createdNew);
+            createdNew.Should().BeTrue();
+            started.Set();
         });
         owner.IsBackground = true;
         owner.Start();
+        started.Wait(TestContext.Current.CancellationToken);
         owner.Join();
 
-        ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                // Keep the named handle alive so TryOpenExisting succeeds and WaitOne
+                // observes AbandonedMutexException from the dead owner thread.
+                ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+            }
+            else
+            {
+                // pthread/file mutexes are not abandoned on thread exit while the handle lives.
+                abandoned!.Dispose();
+                abandoned = null;
+                ExpressChainManager.IsHeldNamedMutex(name).Should().BeFalse();
+            }
+        }
+        finally
+        {
+            abandoned?.Dispose();
+        }
     }
 }
