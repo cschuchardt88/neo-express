@@ -152,10 +152,20 @@ test("every official C# starter hydrates, uses ABI casing, and builds", async ()
       assert.match(testCsproj, /create -o default\.neo-express/);
       assert.doesNotMatch(testCsproj, /Tests\.neo-express/);
 
+      const restore = spawnSync("dotnet", ["tool", "restore"], {
+        cwd: destination,
+        encoding: "utf8",
+      });
+      assert.equal(
+        restore.status,
+        0,
+        `${starter.id} tool restore failed:\n${restore.stdout}\n${restore.stderr}`
+      );
+
       const build = spawnSync(
         "dotnet",
-        ["build", join(destination, "src", `${starter.className}.csproj`), "-v", "q"],
-        { encoding: "utf8" }
+        ["build", join("src", `${starter.className}.csproj`), "-v", "q"],
+        { cwd: destination, encoding: "utf8" }
       );
       assert.equal(
         build.status,
