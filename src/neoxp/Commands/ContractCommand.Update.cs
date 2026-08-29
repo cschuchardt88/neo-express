@@ -67,7 +67,8 @@ namespace NeoExpress.Commands
                     var (chainManager, _) = chainManagerFactory.LoadChain(Input);
                     var password = chainManager.Chain.ResolvePassword(Account, Password);
                     using var txExec = txExecutorFactory.Create(chainManager, Trace, Json);
-                    var data = ParseUpdateData(Data, txExec.ContractParameterParser);
+                    var parser = await txExec.ExpressNode.GetContractParameterParserAsync(chainManager.Chain).ConfigureAwait(false);
+                    var data = ParseUpdateData(Data, s => parser.ParseParameter(s));
                     await txExec.ContractUpdateAsync(Contract, NefFile, Account, password, WitnessScope, data).ConfigureAwait(false);
                     return 0;
                 }
