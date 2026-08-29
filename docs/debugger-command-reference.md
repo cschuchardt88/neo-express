@@ -1,57 +1,156 @@
 <!-- markdownlint-enable -->
-# Neo Smart Contract Debugger
+# NeoDebug Command Reference
 
-The [Neo Smart Contract Debugger](../extensions/neodebug-vscode/README.md) VS Code extension
-registers the `neo-contract` debug type and launches [`neodebug`](../src/neodebug) (`Neo.Debug`
-global tool) as a Debug Adapter.
+Walkthrough: [getting-started.md](getting-started.md#debugger).
 
-Getting started: [getting-started.md](getting-started.md#debugger).
+NeoDebug (`neodebug`) is a source-level debugger for Neo N3 smart contracts. It is a
+[Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) host: an editor
+launches it and speaks DAP over standard in/out, letting you set breakpoints in your C# (or
+other supported language) source, step through execution, and inspect arguments, locals,
+static fields, the evaluation stack, and contract storage.
 
-## Install
+NeoDebug debugs a **recorded execution trace** (a `.neo-trace` file). Because the execution is
+a recording, you can step **backward** as well as forward — *time-travel debugging*.
+
+## Installation
+
+NeoDebug is distributed as a .NET global tool:
 
 ```shell
 dotnet tool install Neo.Debug -g
+dotnet tool update Neo.Debug -g
 ```
 
-The extension runs `neodebug` from `PATH`. Override with
-`neo-contract.debugAdapterPath` in VS Code settings.
+Confirm the install with:
 
-Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and VS Code 1.104+.
+```shell
+neodebug --version
+```
 
-From this repository you can also run `dotnet run --project src/neodebug`.
+## Workflow
+
+1. **Compile** your contract with debug information. The Neo C# compiler (`nccs`) emits a
+   `<contract>.nef`, a `<contract>.manifest.json`, and a `<contract>.nefdbgnfo` (a compressed
+   `*.debug.json`, the [NEP-19](https://github.com/neo-project/proposals) source map). Use the
+   *extended*, unoptimized debug build so every statement has a sequence point.
+
+2. **Capture a trace.** Produce a `.neo-trace` for the invocation you want to debug — for
+   example with [NeoTrace](trace-command-reference.md) against a public transaction, or by
+   starting a Neo-Express node with `neoxp run --trace` (which writes
+   `<txhash>.neo-trace` files as it executes).
+
+3. **Configure** a launch configuration (see below) that points at the contract and the trace.
+
+4. **Debug.** Launch from your editor's debug view. Set breakpoints on source lines; use
+   continue, step in/out/over, and — because this is a recorded trace — step back and reverse
+   continue to move backward through the execution.
+
+### Example: debug a local contract call
+
+Assume `Contract.csproj` uses `Neo.BuildTasks`, produces `bin/sc/Contract.nef`, and exposes a
+parameterless `getValue` method. From the contract project directory, build and deploy it to a
+fresh Neo-Express instance, then invoke the method with tracing enabled:
+
+```shell
+dotnet build ./Contract.csproj
+neoxp create --force --output ./debug.neo-express
+neoxp contract deploy --input ./debug.neo-express ./bin/sc/Contract.nef genesis
+neoxp contract run --input ./debug.neo-express --trace --account genesis Contract getValue
+```
+
+The final command prints the transaction hash and writes `<transaction-hash>.neo-trace` in the
+current directory. Put that file in `traces/`, replace the placeholder in the launch configuration
+below with its file name, set a breakpoint in the contract source, and start the **Debug Neo
+contract (trace)** configuration from VS Code's Run and Debug view.
 
 ## Launch configuration
 
-Add a configuration to `.vscode/launch.json`. `program` and `invocation` are required.
+`neodebug` is a DAP stdio host, so an editor (or any DAP client) spawns it and sends a `launch`
+request whose configuration carries these properties:
 
-This build of `neodebug` **replays recorded traces**. Capture one with
-`neoxp contract invoke --trace` (or `neoxp run --trace`) locally, or with `neotrace` for a
-public-chain transaction ([trace-command-reference.md](trace-command-reference.md)).
+| Property | Required | Description |
+| --- | --- | --- |
+| `program` | yes | Path to the compiled `.nef`. Its sibling `.manifest.json` and `.nefdbgnfo`/`.debug.json` are loaded automatically. |
+| `invocation` | yes | Either `{ "trace-file": "<path>" }` to **replay** a recorded trace, or `{ "operation": "<method>", "args": [ ... ] }` to **deploy and run** the contract live. |
+| `returnTypes` | no | Array of cast hints (`int`, `bool`, `string`, `hex`, `byte[]`, `addr`) for rendering the method's return values. The legacy `return-types` spelling is also accepted. |
+| `sourceFileMap` | no | Object remapping the document paths baked into the debug info to their location on this machine. |
 
-| Property | Meaning |
-| -------- | ------- |
-| `program` | Absolute path to the compiled `.nef`. Sibling `.manifest.json` and `.nefdbgnfo` / `.debug.json` are loaded automatically. |
-| `invocation` | `{ "trace-file": "<path>" }` to replay a `.neo-trace`. Live `{ "operation", "args" }` launch is not supported in this build. |
-| `returnTypes` | Optional cast hints for return values: `int`, `bool`, `string`, `hex`, `byte[]`, `addr`. (`return-types` is accepted as an alias.) |
-| `sourceFileMap` | Optional map from paths stored in debug info to paths on this machine. |
-
-The default source vs disassembly view is a `neodebug` CLI flag (`-v` / `--debug-view`),
-not a `launch.json` property.
-
-### Replay a recorded trace (step backward)
+A VS Code `launch.json` entry looks like:
 
 ```jsonc
 {
-  "name": "Debug Neo contract (trace)",
-  "type": "neo-contract",
-  "request": "launch",
-  "program": "${workspaceFolder}/src/bin/sc/Nep17Contract.nef",
-  "invocation": { "trace-file": "${workspaceFolder}/traces/transaction.neo-trace" },
-  "returnTypes": [ "string" ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Neo contract (trace)",
+      "type": "neo-contract",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/sc/Contract.nef",
+      "invocation": {
+        "trace-file": "${workspaceFolder}/traces/0xabc...neo-trace"
+      },
+      "returnTypes": [ "int" ]
+    }
+  ]
 }
 ```
 
-Set breakpoints in the C# contract source, then start debugging.
+To **deploy and run the contract live** instead, give the invocation an `operation` (and optional
+`args`) rather than a `trace-file`; the contract is deployed into a fresh, single-block in-process
+chain and the debugger stops at the call:
 
-Example contracts that emit `.nef` + `.nefdbgnfo` on `dotnet build` are under
-[`samples/examples/`](../samples/examples/README.md).
+```jsonc
+{
+  "name": "Debug Neo contract (live)",
+  "type": "neo-contract",
+  "request": "launch",
+  "program": "${workspaceFolder}/bin/sc/Contract.nef",
+  "invocation": {
+    "operation": "transfer",
+    "args": [ "@NXV7ZhHiyM1aHXwpVsRZC6BwNFP2jghXAq", 100 ]
+  },
+  "returnTypes": [ "bool" ]
+}
+```
+
+> The repository includes a [VS Code extension](../extensions/neodebug-vscode/README.md) that
+> registers the `neo-contract` debug type and launches `neodebug` from your `PATH`. Set
+> `neo-contract.debugAdapterPath` in VS Code when you need to use a specific debugger build.
+> Other DAP clients can also launch `neodebug` and send the same configuration.
+
+## Debug views
+
+NeoDebug presents two views. The `--debug-view` option selects the initial view; a DAP client can
+switch views later with NeoDebug's `debugview` request:
+
+- **Source** (default) — steps and breakpoints follow your source lines.
+- **Disassembly** — steps and breakpoints follow the NeoVM instructions, with the evaluation
+  stack and slots exposed as raw values.
+
+If source debug information is unavailable, a source-mode launch falls back to disassembly and
+reports the fallback in the debug console.
+
+## Evaluating expressions
+
+In the debug console you can evaluate:
+
+- named arguments, locals, and static fields by name;
+- slots by index — `#arg0`, `#local1`, `#static0`, `#eval0`, `#result0`;
+- contract storage rows — `#storage[...]`;
+- with a leading cast — `(int)`, `(bool)`, `(string)`, `(hex)`, `(byte[])`, `(addr)`.
+
+## Replay vs. live
+
+NeoDebug supports two ways to drive an invocation:
+
+- **Replay** (`invocation.trace-file`) — steps a recorded `.neo-trace`. Because the execution is a
+  recording, you can step **backward** (time-travel).
+- **Live** (`invocation.operation`) — deploys the contract into a fresh, single-block in-process
+  chain and steps the call as it really executes. Live debugging cannot step backward.
+
+The live launch runs against a throwaway local chain seeded only with the contract under debug;
+multi-contract scenarios, signer/account resolution against a Neo-Express chain, checkpoints, and
+oracle responses are not yet wired into the launcher.
+
+The live transaction uses the zero account with `CalledByEntry` scope and follows normal Neo witness
+rules. Witness checks for other accounts fail; no signatures are fabricated by the debugger.

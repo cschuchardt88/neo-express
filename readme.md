@@ -252,6 +252,18 @@ Please review the [NeoTrace Command Reference](docs/trace-command-reference.md) 
 | [WorkNet](docs/worknet-command-reference.md) | Branch MainNet/TestNet |
 | [Trace](docs/trace-command-reference.md) | Public-chain traces |
 
+### NeoDebug
+
+NeoDebug (`neodebug`) is a source-level, time-travel debugger for Neo N3 smart contracts. It
+replays a `.neo-trace` recording over the Debug Adapter Protocol, so you can set breakpoints in
+your source, step forwards and backwards, and inspect arguments, locals, statics, and storage.
+
+```shell
+dotnet tool install Neo.Debug -g
+```
+
+Please review the [NeoDebug Command Reference](docs/debugger-command-reference.md) for installation, the launch configuration, and the debugging workflow.
+
 ## New Features or issues
 
 Thank you for using Neo-Express, Neo-WorkNet and Neo-Trace! We welcome your feedback to make these tools more accessible, intuitive, and powerful.
