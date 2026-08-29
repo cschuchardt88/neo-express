@@ -224,7 +224,18 @@ public class ExpressNodeExtensionsTests
 
         var act = async () => await node.EnsureTransactionSucceededAsync(UInt256.Zero, TimeSpan.FromSeconds(2));
 
-        await act.Should().ThrowAsync<Exception>().WithMessage("*FAULT*");
+        await act.Should().ThrowAsync<Exception>()
+            .WithMessage("*FAULT*Insufficient GAS*");
+    }
+
+    [Fact]
+    public async Task WriteTxHashAsync_reports_confirmed_after_success()
+    {
+        using var writer = new StringWriter();
+        await writer.WriteTxHashAsync(UInt256.Zero, "Deployment", json: false, confirmed: true);
+        writer.ToString().Should().Contain("Deployment");
+        writer.ToString().Should().Contain("confirmed");
+        writer.ToString().Should().NotContain("submitted");
     }
 
     [Fact]

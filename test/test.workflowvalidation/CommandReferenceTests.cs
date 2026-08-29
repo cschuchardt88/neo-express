@@ -25,6 +25,8 @@ public class CommandReferenceTests
         commandReference.Should().Contain("Default: 1");
         commandReference.Should().Contain("`--force` on the **same** hash");
         commandReference.Should().Contain("ContractManagement.Update");
+        commandReference.Should().Contain("VM exception message");
+        commandReference.Should().Contain("reports the transaction as confirmed");
     }
 
     [Fact]

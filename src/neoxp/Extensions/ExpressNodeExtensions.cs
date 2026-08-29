@@ -355,7 +355,10 @@ namespace NeoExpress
                         var fault = log.Executions.FirstOrDefault(execution => execution.VMState == VMState.FAULT);
                         if (fault is not null)
                         {
-                            throw new Exception($"Transaction {txHash} FAULT");
+                            var detail = string.IsNullOrEmpty(fault.ExceptionMessage)
+                                ? string.Empty
+                                : $": {fault.ExceptionMessage}";
+                            throw new Exception($"Transaction {txHash} FAULT{detail}");
                         }
                         if (log.Executions.Any(execution => execution.VMState == VMState.HALT))
                         {

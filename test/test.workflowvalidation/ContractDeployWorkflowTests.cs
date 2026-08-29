@@ -86,7 +86,11 @@ public class ContractDeployWorkflowTests
                 force: true,
                 additionalGas: 1m);
 
-            writer.ToString().Should().Contain("Update");
+            var output = writer.ToString();
+            output.Should().Contain("Deployment");
+            output.Should().Contain("Update");
+            output.Should().Contain("confirmed");
+            output.Should().NotContain("submitted");
 
             var deployed = await txExec.ExpressNode.ListContractsAsync();
             deployed.Count(c => c.manifest.Name == "DevHawk Registrar").Should().Be(1);

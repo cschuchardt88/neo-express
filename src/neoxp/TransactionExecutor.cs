@@ -92,7 +92,7 @@ namespace NeoExpress
                 .UpdateAsync(scriptHash, nefFile, manifest, wallet, accountHash, witnessScope, data, additionalGas)
                 .ConfigureAwait(false);
             await expressNode.EnsureTransactionSucceededAsync(txHash).ConfigureAwait(false);
-            await writer.WriteTxHashAsync(txHash, "Update", json).ConfigureAwait(false);
+            await writer.WriteTxHashAsync(txHash, "Update", json, confirmed: true).ConfigureAwait(false);
         }
 
         public async Task ContractDeployAsync(string contract, string accountName, string password, WitnessScope witnessScope, string data, bool force, decimal additionalGas = 1m)
@@ -242,7 +242,7 @@ namespace NeoExpress
             }
             else
             {
-                await writer.WriteLineAsync($"{action} of {name} ({contractHash}) Transaction {txHash} submitted").ConfigureAwait(false);
+                await writer.WriteLineAsync($"{action} of {name} ({contractHash}) Transaction {txHash} confirmed").ConfigureAwait(false);
             }
         }
 

@@ -347,7 +347,9 @@ Additionally, the command requires the signing account that will pay the GAS dep
 
 RPC fee estimation is slightly below persist-time `_deploy` consumption. `--gas` (default `1`)
 is added on top of a 0.1 GAS pad so the submitted transaction does not FAULT with
-Insufficient GAS. After submit, Neo-Express waits for the application log; FAULT is an error.
+Insufficient GAS. After submit, Neo-Express waits for the application log; FAULT is an error
+and includes the VM exception message (for example `Insufficient GAS`). On HALT the command
+reports the transaction as confirmed.
 
 By default, Neo-Express will not deploy multiple contracts with the same name to avoid developer
 confusion. `--force` on a **different** hash still allows that conflicting-name deployment.
