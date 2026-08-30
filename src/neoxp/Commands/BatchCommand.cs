@@ -172,7 +172,7 @@ namespace NeoExpress.Commands
                                     cmd.Model.WitnessScope,
                                     cmd.Model.Data,
                                     cmd.Model.Force,
-                                    1m).ConfigureAwait(false);
+                                    cmd.Model.AdditionalGas).ConfigureAwait(false);
                                 break;
                             }
                         case CommandLineApplication<BatchFileCommands.Contract.Download> cmd:
@@ -252,7 +252,8 @@ namespace NeoExpress.Commands
                                     cmd.Model.Account,
                                     cmd.Model.Password,
                                     cmd.Model.WitnessScope,
-                                    data).ConfigureAwait(false);
+                                    data,
+                                    cmd.Model.AdditionalGas).ConfigureAwait(false);
                                 break;
                             }
                         case CommandLineApplication<BatchFileCommands.Execute> cmd:
