@@ -24,6 +24,7 @@ using Neo.SmartContract;
 using Neo.SmartContract.Manifest;
 using Neo.SmartContract.Native;
 using Neo.VM;
+using Neo.Wallets;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Immutable;
@@ -102,19 +103,20 @@ namespace NeoDebug.Neo3
             if (string.IsNullOrEmpty(operation))
                 throw new JsonException("The 'invocation' must specify a 'trace-file' to replay or an 'operation' to invoke.");
 
-            return CreateLiveEngine(program, nef, invocation, operation);
+            return CreateLiveEngine(config, program, nef, invocation, operation);
         }
 
         // Deploys the contract into a fresh, single-block in-process chain and positions a live engine at the
         // requested invocation, so the same DebugSession can step it as it really executes.
-        private static IApplicationEngine CreateLiveEngine(string program, NefFile nef, JToken invocation, string operation)
+        private static IApplicationEngine CreateLiveEngine(IReadOnlyDictionary<string, JToken> config, string program, NefFile nef, JToken invocation, string operation)
         {
             var manifest = ContractManifest.Parse(File.ReadAllText(Path.ChangeExtension(program, ".manifest.json")));
+
+            var (signers, deploySigner) = ParseSigners(config);
 
             var store = new MemoryStore();
             store.EnsureLedgerInitialized(Settings);
 
-            var deploySigner = new Signer { Account = UInt160.Zero, Scopes = WitnessScope.CalledByEntry };
             UInt160 contractHash;
             using (var snapshot = new StoreCache(store.GetSnapshot()))
             {
@@ -134,7 +136,6 @@ namespace NeoDebug.Neo3
                 invokeScript = builder.ToArray();
             }
 
-            var signers = new[] { new Signer { Account = deploySigner.Account, Scopes = WitnessScope.CalledByEntry } };
             var tx = new Transaction
             {
                 Version = 0,
@@ -155,6 +156,54 @@ namespace NeoDebug.Neo3
             var engine = new DebugApplicationEngine(tx, engineSnapshot, Settings, block, null);
             engine.LoadScript(invokeScript);
             return engine;
+        }
+
+        // Parses the launch configuration's signers. All signers use the ApplicationEngine's protocol witness
+        // rules; when none are configured, the live launch uses the default zero-account signer.
+        private static (Signer[] signers, Signer deploySigner) ParseSigners(IReadOnlyDictionary<string, JToken> config)
+        {
+            if (!config.TryGetValue("signers", out var signersJson))
+                return CreateDefaultSigners();
+
+            if (signersJson.Type != JTokenType.Array || !signersJson.HasValues)
+                throw new JsonException("The 'signers' property must be a non-empty array of Neo N3 addresses.");
+
+            if (signersJson.Count() > Transaction.MaxTransactionAttributes)
+                throw new JsonException($"The 'signers' property cannot contain more than {Transaction.MaxTransactionAttributes} addresses.");
+
+            var accounts = new HashSet<UInt160>();
+            var signers = new List<Signer>();
+            foreach (var token in signersJson)
+            {
+                if (token.Type != JTokenType.String)
+                    throw new JsonException("Each entry in the 'signers' property must be a Neo N3 address string.");
+
+                var account = ParseAddress(token.Value<string>()!);
+                if (!accounts.Add(account))
+                    throw new JsonException($"The 'signers' property contains the duplicate address '{token.Value<string>()}'.");
+
+                signers.Add(new Signer { Account = account, Scopes = WitnessScope.CalledByEntry });
+            }
+
+            return (signers.ToArray(), signers[0]);
+
+            static (Signer[] signers, Signer deploySigner) CreateDefaultSigners()
+            {
+                var deploySigner = new Signer { Account = UInt160.Zero, Scopes = WitnessScope.CalledByEntry };
+                return (new[] { deploySigner }, deploySigner);
+            }
+        }
+
+        private static UInt160 ParseAddress(string address)
+        {
+            try
+            {
+                return address.ToScriptHash(Settings.AddressVersion);
+            }
+            catch (FormatException ex)
+            {
+                throw new JsonException($"Invalid Neo N3 signer address '{address}'.", ex);
+            }
         }
 
         // Deploys through ContractManagement so registry indexes, native calling context and the _deploy runtime

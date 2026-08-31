@@ -11,10 +11,14 @@
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using Neo;
 using Neo.Extensions;
+using Neo.IO;
 using Neo.SmartContract;
+using Neo.SmartContract.Manifest;
 using Neo.SmartContract.Native;
 using Neo.VM;
+using Neo.Wallets;
 using NeoDebug.Neo3;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -41,7 +45,7 @@ namespace test.neodebug
             ""extra"": null
         }";
 
-        static string WriteContractFiles(byte[]? script = null, JObject? manifest = null)
+        static string WriteContractFiles(byte[]? script = null, JObject? manifest = null, ContractParameterType returnType = ContractParameterType.Integer)
         {
             var basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
@@ -55,7 +59,12 @@ namespace test.neodebug
             nef.CheckSum = NefFile.ComputeChecksum(nef);
 
             File.WriteAllBytes(basePath + ".nef", nef.ToArray());
-            File.WriteAllText(basePath + ".manifest.json", manifest?.ToString() ?? ManifestJson);
+            if (manifest is null)
+            {
+                manifest = JObject.Parse(ManifestJson);
+                manifest["abi"]!["methods"]![0]!["returntype"] = returnType.ToString();
+            }
+            File.WriteAllText(basePath + ".manifest.json", manifest.ToString());
             return basePath + ".nef";
         }
 
@@ -67,6 +76,21 @@ namespace test.neodebug
             if (returnTypes is not null)
                 args.ConfigurationProperties["returnTypes"] = returnTypes;
             return args;
+        }
+
+        static async Task<List<OutputEvent>> RunSignedContract(byte[] script, UInt160 signer)
+        {
+            var events = new List<DebugEvent>();
+            var args = LaunchArgs(WriteContractFiles(script, returnType: ContractParameterType.Boolean), new JObject { ["operation"] = "main" });
+            args.ConfigurationProperties["signers"] = new JArray(signer.ToAddress(ProtocolSettings.Default.AddressVersion));
+
+            var session = await LaunchConfigParser.CreateDebugSessionAsync(args, events.Add, DebugView.Source);
+            session.Start();
+            session.Continue();
+            (session as IDisposable)?.Dispose();
+
+            Assert.DoesNotContain(events.OfType<OutputEvent>(), e => e.Category == OutputEvent.CategoryValue.Stderr);
+            return events.OfType<OutputEvent>().ToList();
         }
 
         [Fact]
@@ -153,6 +177,141 @@ namespace test.neodebug
 
             Assert.Contains(events.OfType<OutputEvent>(), e => e.Output.Contains("Return: True"));
             Assert.DoesNotContain(events.OfType<OutputEvent>(), e => e.Category == OutputEvent.CategoryValue.Stderr);
+        }
+
+        [Fact]
+        public async Task live_launch_deploys_under_a_configured_signer()
+        {
+            var events = new List<DebugEvent>();
+            var signer = UInt160.Parse("0x0000000000000000000000000000000000000001").ToAddress(ProtocolSettings.Default.AddressVersion);
+            var args = LaunchArgs(WriteContractFiles(), new JObject { ["operation"] = "main" }, new JArray("int"));
+            args.ConfigurationProperties["signers"] = new JArray(signer);
+
+            // The contract deploys under (and the invocation is signed by) the configured account; main() does
+            // not check witnesses, so it still runs to HALT returning 7.
+            var session = await LaunchConfigParser.CreateDebugSessionAsync(args, events.Add, DebugView.Source);
+            session.Start();
+            session.Continue();
+
+            Assert.Contains(events.OfType<OutputEvent>(), e => e.Output.Contains("Return: 7"));
+            Assert.DoesNotContain(events.OfType<OutputEvent>(), e => e.Category == OutputEvent.CategoryValue.Stderr);
+
+            (session as IDisposable)?.Dispose();
+        }
+
+        [Theory]
+        [MemberData(nameof(InvalidSignerConfigurations))]
+        public async Task live_launch_rejects_invalid_signer_configuration(JToken signers, string expectedMessage)
+        {
+            var args = LaunchArgs(WriteContractFiles(), new JObject { ["operation"] = "main" });
+            args.ConfigurationProperties["signers"] = signers;
+
+            var exception = await Assert.ThrowsAsync<JsonException>(() =>
+                LaunchConfigParser.CreateDebugSessionAsync(args, _ => { }, DebugView.Source));
+
+            Assert.Contains(expectedMessage, exception.Message);
+        }
+
+        public static IEnumerable<object[]> InvalidSignerConfigurations()
+        {
+            var address = UInt160.Zero.ToAddress(ProtocolSettings.Default.AddressVersion);
+            yield return new object[] { new JValue(address), "non-empty array" };
+            yield return new object[] { new JArray(), "non-empty array" };
+            yield return new object[] { new JArray(1), "address string" };
+            yield return new object[] { new JArray("not-an-address"), "Invalid Neo N3 signer address" };
+            yield return new object[] { new JArray(address, address), "duplicate address" };
+            yield return new object[]
+            {
+                new JArray(Enumerable.Range(0, Neo.Network.P2P.Payloads.Transaction.MaxTransactionAttributes + 1)
+                    .Select(i => new UInt160(BitConverter.GetBytes(i).Concat(new byte[16]).ToArray())
+                        .ToAddress(ProtocolSettings.Default.AddressVersion))),
+                "cannot contain more than",
+            };
+        }
+
+        [Fact]
+        public async Task configured_signers_support_public_key_witnesses()
+        {
+            var key = new KeyPair(Enumerable.Repeat((byte)1, 32).ToArray());
+            var signer = Contract.CreateSignatureRedeemScript(key.PublicKey).ToScriptHash();
+            using var builder = new ScriptBuilder();
+            builder.EmitPush(key.PublicKey.EncodePoint(true));
+            builder.EmitSysCall(ApplicationEngine.System_Runtime_CheckWitness);
+            builder.Emit(OpCode.RET);
+
+            var output = await RunSignedContract(builder.ToArray(), signer);
+
+            Assert.Contains(output, e => e.Output.Contains("Return: True"));
+        }
+
+        [Fact]
+        public async Task configured_signers_honor_called_by_entry_scope()
+        {
+            var signer = UInt160.Parse("0x0000000000000000000000000000000000000001");
+            using var builder = new ScriptBuilder();
+            builder.Emit(OpCode.INITSLOT, new byte[] { 0, 1 });
+            builder.Emit(OpCode.NEWARRAY0);
+            builder.EmitPush((byte)CallFlags.All);
+            builder.EmitPush("nested");
+            builder.Emit(OpCode.LDARG0);
+            builder.EmitSysCall(ApplicationEngine.System_Contract_Call);
+            builder.Emit(OpCode.RET);
+            var nestedOffset = builder.Length;
+            builder.EmitPush(signer.ToArray());
+            builder.EmitSysCall(ApplicationEngine.System_Runtime_CheckWitness);
+            builder.Emit(OpCode.RET);
+
+            var manifest = JObject.Parse(ManifestJson);
+            manifest["abi"]!["methods"] = new JArray(
+                new JObject
+                {
+                    ["name"] = "main",
+                    ["parameters"] = new JArray(new JObject { ["name"] = "target", ["type"] = "Hash160" }),
+                    ["returntype"] = "Boolean",
+                    ["offset"] = 0,
+                    ["safe"] = true,
+                },
+                new JObject
+                {
+                    ["name"] = "nested",
+                    ["parameters"] = new JArray(),
+                    ["returntype"] = "Boolean",
+                    ["offset"] = nestedOffset,
+                    ["safe"] = true,
+                });
+            var program = WriteContractFiles(builder.ToArray(), manifest: manifest);
+            var reader = new MemoryReader(File.ReadAllBytes(program));
+            var nef = reader.ReadSerializable<NefFile>();
+            var contractHash = Neo.SmartContract.Helper.GetContractHash(signer, nef.CheckSum, "LiveTest");
+            var events = new List<DebugEvent>();
+            var args = LaunchArgs(program, new JObject
+            {
+                ["operation"] = "main",
+                ["args"] = new JArray($"#{contractHash}"),
+            });
+            args.ConfigurationProperties["signers"] = new JArray(signer.ToAddress(ProtocolSettings.Default.AddressVersion));
+
+            var session = await LaunchConfigParser.CreateDebugSessionAsync(args, events.Add, DebugView.Source);
+            session.Start();
+            session.Continue();
+            (session as IDisposable)?.Dispose();
+
+            Assert.DoesNotContain(events.OfType<OutputEvent>(), e => e.Category == OutputEvent.CategoryValue.Stderr);
+            Assert.Contains(events.OfType<OutputEvent>(), e => e.Output.Contains("Return: False"));
+        }
+
+        [Fact]
+        public async Task configured_signers_preserve_calling_contract_witnesses()
+        {
+            var signer = UInt160.Parse("0x0000000000000000000000000000000000000001");
+            using var builder = new ScriptBuilder();
+            builder.EmitSysCall(ApplicationEngine.System_Runtime_GetCallingScriptHash);
+            builder.EmitSysCall(ApplicationEngine.System_Runtime_CheckWitness);
+            builder.Emit(OpCode.RET);
+
+            var output = await RunSignedContract(builder.ToArray(), signer);
+
+            Assert.Contains(output, e => e.Output.Contains("Return: True"));
         }
     }
 }
