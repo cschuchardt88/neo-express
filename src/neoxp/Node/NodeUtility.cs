@@ -34,6 +34,14 @@ namespace NeoExpress.Node
     {
         internal static string ContractNotFoundMessage(UInt160 scriptHash) => $"Contract {scriptHash} not found";
 
+        // RPC invokescript / Wallet.MakeTransaction report slightly less GAS than persist-time
+        // execution consumes. Contract deploy/update was observed 480 datoshi short, which FAULTs
+        // with "Insufficient GAS." Pad only those paths; --gas is extra on top.
+        internal const long InvokeEstimatePadDatoshi = 10_000_000L; // 0.1 GAS
+
+        internal static long SystemFeeDelta(decimal additionalGas, bool padInvokeEstimate = false)
+            => AdditionalGasSystemFee(additionalGas) + (padInvokeEstimate ? InvokeEstimatePadDatoshi : 0L);
+
         // Convert an --additional-gas amount to the system-fee delta (in GAS datoshi),
         // with clear errors instead of the raw exceptions the bare conversion throws: an
         // ArgumentException for more than GAS.Decimals fractional digits, and an

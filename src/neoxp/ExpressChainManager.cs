@@ -23,6 +23,7 @@ using Nito.Disposables;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using System.Net;
+using System.Threading;
 
 namespace NeoExpress
 {
@@ -158,10 +159,48 @@ namespace NeoExpress
         private static bool IsNodeRunning(ExpressConsensusNode node)
         {
             // Check to see if there's a neo-express blockchain currently running by
-            // attempting to open a mutex with the multisig account address for a name
+            // attempting to open a mutex with the consensus account script hash for a name.
+            // TryOpenExisting only returns a handle; WaitOne is required to detect
+            // abandonment when the previous process died without releasing it.
 
             var account = node.Wallet.Accounts.Single(a => a.IsDefault);
-            return Mutex.TryOpenExisting(GLOBAL_PREFIX + account.ScriptHash, out var _);
+            return IsHeldNamedMutex(GLOBAL_PREFIX + account.ScriptHash);
+        }
+
+        internal static bool IsHeldNamedMutex(string mutexName)
+        {
+            try
+            {
+                if (!Mutex.TryOpenExisting(mutexName, out var mutex))
+                    return false;
+
+                using (mutex)
+                {
+                    try
+                    {
+                        if (!mutex.WaitOne(1))
+                            return true;
+
+                        mutex.ReleaseMutex();
+                        return false;
+                    }
+                    catch (AbandonedMutexException)
+                    {
+                        try
+                        {
+                            mutex.ReleaseMutex();
+                        }
+                        catch (ApplicationException)
+                        {
+                        }
+                        return false;
+                    }
+                }
+            }
+            catch (AbandonedMutexException)
+            {
+                return false;
+            }
         }
 
         public bool IsRunning(ExpressConsensusNode? node = null)

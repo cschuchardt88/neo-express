@@ -127,6 +127,9 @@ namespace NeoExpress.Commands
 
                     [Option(Description = "Deploy contract regardless of name conflict")]
                     internal bool Force { get; }
+
+                    [Option("--gas|-g", CommandOptionType.SingleValue, Description = "Additional GAS to apply to the contract deployment")]
+                    internal decimal AdditionalGas { get; init; } = 1;
                 }
 
                 [Command("download")]
@@ -226,6 +229,9 @@ namespace NeoExpress.Commands
 
                     [Option(Description = "Data parameter for update method on contract (Format: JSON)")]
                     internal string Data { get; init; } = string.Empty;
+
+                    [Option("--gas|-g", CommandOptionType.SingleValue, Description = "Additional GAS to apply to the contract update")]
+                    internal decimal AdditionalGas { get; init; } = 1;
                 }
             }
 

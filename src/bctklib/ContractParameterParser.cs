@@ -183,7 +183,8 @@ namespace Neo.BlockchainToolkit
                     ? value
                     : UInt160.TryParse(contract, out var uint160)
                         ? uint160
-                        : throw new InvalidOperationException($"contract \"{contract}\" not found");
+                        : throw new InvalidOperationException(
+                        $"contract \"{contract}\" not found. Deploy it first (`neoxp contract deploy <file.nef> genesis`) or use a name/hash from `neoxp contract list`. A leading '#' is not a file path.");
 
                 var operation = json.Value<string>("operation")
                     ?? throw new JsonException("missing operation field");
