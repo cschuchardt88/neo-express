@@ -32,7 +32,12 @@ Add a configuration to `.vscode/launch.json`. Replay a recorded trace (supports 
 ```
 
 This build of `neodebug` replays recorded traces (`invocation.trace-file`). Live
-`{ "operation", "args" }` launch is not supported yet.
+`{ "operation", "args" }` launch is documented in the
+[NeoDebug command reference](../../docs/debugger-command-reference.md) when the debugger build
+supports it.
+
+`signers` is optional. When omitted, the live launcher uses the zero account; normal Neo witness
+scope rules still apply.
 
 Set breakpoints in your C# source, then start debugging. See the
 [NeoDebug command reference](../../docs/debugger-command-reference.md) for the launch-configuration
