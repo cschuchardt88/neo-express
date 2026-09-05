@@ -15,7 +15,14 @@ Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 ```shell
 # From this repository (includes the deploy fee pad; NuGet 3.10.1 does not)
 dotnet build src/neoxp/neoxp.csproj
-# then run src/neoxp/bin/Debug/net10.0/neoxp (or `dotnet exec` that DLL)
+
+# Bash (run from the repository root)
+REPO_ROOT="$(pwd)"
+neoxp() { dotnet exec "$REPO_ROOT/src/neoxp/bin/Debug/net10.0/neoxp.dll" "$@"; }
+
+# PowerShell (run from the repository root)
+$repoRoot = (Get-Location).Path
+function neoxp { dotnet exec "$repoRoot\src\neoxp\bin\Debug\net10.0\neoxp.dll" @args }
 ```
 
 A published tool (`dotnet tool install Neo.Express -g`) is fine for commands other than
@@ -51,11 +58,10 @@ Full command list: [command-reference.md](command-reference.md).
 
 ## 3. Compile a C# contract
 
-This repo already has Express-ready starters. From `samples/examples/Nep17` (or pass that
-path from the repository root):
+This repo already has Express-ready starters. Stay in `samples/examples/Nep17`:
 
 ```shell
-dotnet build samples/examples/Nep17
+dotnet build
 ```
 
 That:

@@ -83,8 +83,11 @@ test("getting-started walkthrough matches the repo layout without --configuratio
   assert.doesNotMatch(gettingStarted, /transfer\.neo-invoke\.json/);
   assert.match(gettingStarted, /invoke-files\/symbol\.neo-invoke\.json/);
 
-  assert.match(quickstart, /dotnet build samples\/examples\/Nep17/);
-  assert.doesNotMatch(quickstart, /```shell\r?\ndotnet build\r?\n```/);
+  assert.match(quickstart, /REPO_ROOT=/);
+  assert.match(quickstart, /\$repoRoot/);
+  assert.match(quickstart, /cd samples\/examples\/Nep17/);
+  assert.match(quickstart, /```shell\r?\ndotnet build\r?\n```/);
+  assert.doesNotMatch(quickstart, /dotnet build samples\/examples\/Nep17/);
 
   assert.match(props, /Configuration Condition="'\$\(Configuration\)'==''">Debug/);
   assert.doesNotMatch(props, /bin\/\/net10\.0/);
